@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Ma bulle de recommandation – Créateur d'Arbre</title>
+  <style>
+    body {
+      margin: 0; padding: 0;
+      font-family: Verdana, sans-serif;
+      background: linear-gradient(to bottom, #5bc0eb, #20639b);
+      height: 100vh; overflow: hidden;
+      position: relative; animation: fadeIn 0.5s ease forwards;
+    }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+    .nav-bubble {
+      position: absolute; top: 1rem;
+      width: 32px; height: 32px;
+      background: #fff;
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer; backdrop-filter: blur(6px);
+      transition: background 0.2s;
+      z-index: 10; color: #333; font-size: 1rem;
+      user-select: none;
+    }
+    .nav-bubble:hover { background: #eee; }
+    .nav-left  { right: 80px; }
+    .nav-right { right: 20px; }
+
+    #container {
+      position: absolute;
+      top: 4rem; bottom: 2rem;
+      left: 2rem; right: 2rem;
+      background: #f9fcff;
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+      overflow: hidden;
+    }
+
+    #toolbar {
+      display: flex; align-items: center;
+      padding: 0.5rem;
+      background: #fff;
+      border-bottom: 1px solid #ccc;
+    }
+    .shape-btn {
+      width: 40px; height: 40px;
+      margin-right: 12px;
+      border: none; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .decision-shape {
+      background: #4caf50;
+      clip-path: polygon(50% 0%,100% 50%,50% 100%,0% 50%);
+    }
+    .leaf-shape {
+      background: #2196f3;
+      border-radius: 8px;
+    }
+    #toolbar button:not(.shape-btn) {
+      margin-left: auto;
+      background: #cecece;
+      border: none;
+      color: #000;
+      font-size: 1rem;
+      padding: 8px 12px;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    #toolbar button:not(.shape-btn):hover {
+      background: #484848; color: #fff;
+    }
+
+    #cy {
+      width: 100%; height: calc(100% - 50px);
+      position: relative;
+    }
+
+    #trash {
+      position: absolute; bottom: 1rem; right: 1rem;
+      width: 40px; height: 40px;
+      background: url('https://img.icons8.com/material-outlined/48/333333/trash.png') no-repeat center;
+      background-size: 24px 24px;
+      opacity: 0.6; transition: opacity 0.2s;
+      z-index: 5; pointer-events: none;
+    }
+    #trash.hovered {
+      opacity: 1;
+      filter: drop-shadow(0 0 5px red);
+    }
+
+    #labelEditor {
+      position: absolute; display: none;
+      z-index: 9; border: 1px solid #aaa;
+      padding: 4px; font-size: 14px;
+      border-radius: 4px;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+      background: #fff;
+    }
+
+    #helpBox {
+      position: absolute; top: 3.5rem; right: 2rem;
+      width: 240px; background: #fff;
+      border: 1px solid #ccc; padding: 8px;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+      display: none; font-size: 14px;
+      z-index: 9;
+    }
+
+    .bubble-floating {
+      position: absolute; border-radius: 50%;
+      background: rgba(255,255,255,0.1);
+      animation: floatUp 30s linear infinite;
+      pointer-events: none; backdrop-filter: blur(8px);
+      z-index: 0;
+    }
+    @keyframes floatUp {
+      0% { bottom: -100px; transform: translateX(0); }
+      100% { bottom: 110%; transform: translateX(50px); }
+    }
+  </style>
+  <script src="https://unpkg.com/cytoscape@3.32.1/dist/cytoscape.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/lz-string@1.4.4/libs/lz-string.min.js"></script>
+</head>
+<body>
+  <div class="nav-bubble nav-left" onclick="navigate('page2.html')">◀</div>
+  <div class="nav-bubble nav-right" onclick="navigate('index.html')">▶</div>
+
+  <div id="container">
+    <div id="toolbar">
+      <button class="shape-btn decision-shape" id="addDecision" title="Ajouter un nœud de décision"></button>
+      <button class="shape-btn leaf-shape" id="addLeaf" title="Ajouter un nœud résultat"></button>
+      <button id="catToolBtn">Outil de Catégorisation</button>
+      <button id="help">?</button>
+    </div>
+    <div id="cy"></div>
+    <input id="labelEditor" type="text" />
+    <div id="trash" title="Glissez ici pour supprimer"></div>
+    <div id="helpBox">
+      <strong>Contrôles :</strong>
+      <ul style="padding-left:16px; margin:4px 0;">
+        <li>Clique sur le losange pour ajouter un noeud de décision</li>
+        <li>Clique sur le rectangle pour ajouter un noeud résultat</li>
+        <li>Clic droit + glisser pour lier deux noeuds</li>
+        <li>Double-clic pour renommer noeuds et arêtes</li>
+        <li>Glisse un noeud sur la poubelle pour supprimer</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Background bubbles -->
+  <div class="bubble-floating" style="left:10%; width:80px; height:80px; animation-delay:1s;"></div>
+  <div class="bubble-floating" style="left:30%; width:60px; height:60px; animation-delay:5s;"></div>
+  <div class="bubble-floating" style="left:50%; width:100px; height:100px; animation-delay:3s;"></div>
+  <div class="bubble-floating" style="left:70%; width:50px; height:50px; animation-delay:7s;"></div>
+  <div class="bubble-floating" style="left:90%; width:80px; height:80px; animation-delay:4s;"></div>
+
+  <script>
+    function navigate(url) {
+      document.body.classList.add('fade-out');
+      document.body.addEventListener('animationend', () => window.location.href = url, { once: true });
+    }
+
+    document.getElementById('help').addEventListener('click', e => {
+      e.stopPropagation();
+      const box = document.getElementById('helpBox');
+      box.style.display = box.style.display === 'block' ? 'none' : 'block';
+    });
+    document.addEventListener('click', () => document.getElementById('helpBox').style.display = 'none');
+
+    const cy = cytoscape({
+      container: document.getElementById('cy'),
+      elements: [],
+      style: [
+        { selector: 'node', style: {
+            'label': 'data(label)',
+            'text-valign': 'center', 'text-halign': 'center',
+            'color': '#fff', 'width': 'label', 'height': 50,
+            'background-color': '#666'
+          }
+        },
+        { selector: '.decision', style: {
+            'shape': 'diamond', 'background-color': '#4CAF50', 'padding': '30px'
+          }
+        },
+        { selector: '.leaf', style: {
+            'shape': 'roundrectangle', 'background-color': '#2196F3', 'padding': '10px'
+          }
+        },
+        { selector: 'edge', style: {
+            'width': 2, 'line-color': '#000', 'target-arrow-shape': 'triangle',
+            'target-arrow-color': '#000', 'arrow-scale': 1.2, 'curve-style': 'bezier',
+            'label': 'data(label)', 'text-margin-y': -10,
+            'text-background-opacity': 1, 'text-background-color': '#fff',
+            'text-background-shape': 'roundrectangle', 'text-background-padding': 2,
+            'font-size': 12, 'text-rotation': 'autorotate'
+          }
+        }
+      ],
+      layout: { name: 'preset' }
+    });
+
+    let nextNodeId = 0, nextEdgeId = 0;
+    function saveState() {
+      const snap = cy.elements().jsons().map(e => {
+        const out = { group: e.group, data: { ...e.data } };
+        if (e.group === 'nodes' && e.position) out.position = { ...e.position };
+        if (e.classes && e.classes.length) out.classes = e.classes;
+        return out;
+      });
+      const comp = LZString.compressToEncodedURIComponent(JSON.stringify(snap));
+      history.replaceState(null, '', '#' + comp);
+    }
+    function loadState() {
+      const h = location.hash.slice(1); if (!h) return;
+      try {
+        const arr = JSON.parse(LZString.decompressFromEncodedURIComponent(h));
+        cy.elements().remove(); cy.add(arr);
+        const nIds = cy.nodes().map(n => +n.id().slice(1)).filter(x=>!isNaN(x));
+        const eIds = cy.edges().map(e => +e.id().slice(1)).filter(x=>!isNaN(x));
+        nextNodeId = nIds.length ? Math.max(...nIds)+1 : 0;
+        nextEdgeId = eIds.length ? Math.max(...eIds)+1 : 0;
+      } catch(e) {}
+    }
+    window.addEventListener('popstate', loadState);
+    loadState();
+
+    function addNode(type) {
+      const id = (type==='decision'? 'd' : 'l') + nextNodeId++;
+      cy.add({ group: 'nodes', data: { id, label: type==='decision'? 'Décision':'Résultat' }, classes: type,
+        position: { x:100+Math.random()*400, y:100+Math.random()*300 } });
+      saveState();
+    }
+    document.getElementById('addDecision').onclick = () => addNode('decision');
+    document.getElementById('addLeaf').onclick     = () => addNode('leaf');
+    document.getElementById('catToolBtn').onclick   = () => location.href = 'triage.html';
+
+    // Linking logic
+    let origin = null, target = null, dragging = false;
+    const svgNS = "http://www.w3.org/2000/svg";
+    const svg = document.createElementNS(svgNS, 'svg');
+    svg.setAttribute('style', 'position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:5');
+    const defs = document.createElementNS(svgNS, 'defs');
+    const marker = document.createElementNS(svgNS, 'marker');
+    marker.setAttribute('id','arrowHead'); marker.setAttribute('markerWidth','6');
+    marker.setAttribute('markerHeight','6'); marker.setAttribute('refX','0');
+    marker.setAttribute('refY','3'); marker.setAttribute('orient','auto');
+    const path = document.createElementNS(svgNS,'path');
+    path.setAttribute('d','M0,0 L0,6 L6,3 z'); path.setAttribute('fill','#000');
+    marker.appendChild(path); defs.appendChild(marker); svg.appendChild(defs);
+    const line = document.createElementNS(svgNS,'line');
+    line.setAttribute('id','previewLine'); line.setAttribute('stroke','#000');
+    line.setAttribute('stroke-width','2'); line.setAttribute('marker-end','url(#arrowHead)');
+    line.setAttribute('visibility','hidden'); svg.appendChild(line);
+    document.getElementById('cy').appendChild(svg);
+
+    cy.on('cxttapstart','node', evt => {
+      origin = evt.target; dragging = false; target = null;
+      const p = origin.renderedPosition();
+      line.setAttribute('x1',p.x); line.setAttribute('y1',p.y);
+      line.setAttribute('x2',p.x); line.setAttribute('y2',p.y);
+      line.setAttribute('visibility','visible');
+    });
+    cy.on('cxtdrag', evt => {
+      if (!origin) return; dragging = true;
+      const rp = evt.renderedPosition; line.setAttribute('x2',rp.x); line.setAttribute('y2',rp.y);
+    });
+    cy.on('cxtdragover','node', evt => {
+      if (dragging && evt.target.id()!==origin.id()) target = evt.target;
+    });
+    cy.on('cxtdragout','node', evt => {
+      if (target && evt.target.id()===target.id()) target = null;
+    });
+    cy.on('cxttapend', () => {
+      line.setAttribute('visibility','hidden');
+      if (dragging && origin && target && origin.id()!==target.id()) {
+        const cnt = cy.edges().filter(e => e.source().id()===origin.id()).length;
+        const lbl = cnt===0 ? 'oui' : cnt===1 ? 'non' : '';
+        cy.add({ group:'edges', data:{ id:'e'+nextEdgeId, source:origin.id(), target:target.id(), label:lbl } });
+        nextEdgeId++; saveState();
+      }
+      origin = target = null; dragging = false;
+    });
+
+    // Inline editing
+    const labelEditor = document.getElementById('labelEditor'); let editing = null;
+    function showEditor(ele,pos,text){ editing=ele;
+      labelEditor.value = text||'';
+      labelEditor.style.left = pos.x + 'px'; labelEditor.style.top = pos.y + 'px';
+      labelEditor.style.display = 'block'; labelEditor.focus(); labelEditor.select();
+    }
+    cy.on('dbltap','node', evt => showEditor(evt.target, evt.target.renderedPosition(), evt.target.data('label')));
+    cy.on('dbltap','edge', evt => {
+      const e = evt.target, mid=e.midpoint(), z=cy.zoom(), pan=cy.pan();
+      const pos={ x: mid.x*z+pan.x, y: mid.y*z+pan.y };
+      showEditor(e,pos,e.data('label'));
+    });
+    labelEditor.addEventListener('keydown', e => { if(e.key==='Enter') commit(); else if(e.key==='Escape') cancel(); });
+    labelEditor.addEventListener('blur', commit);
+    function commit(){ if(editing && labelEditor.value.trim()){ editing.data('label',labelEditor.value.trim()); saveState(); }
+      labelEditor.style.display='none'; editing=null; }
+    function cancel(){ labelEditor.style.display='none'; editing=null; }
+
+    // Delete via trash
+    let grab=null;
+    cy.on('grab','node', evt => grab=evt.target);
+    cy.on('drag', evt => {
+      if(!grab) return;
+      const rect= document.getElementById('trash').getBoundingClientRect();
+      const cr=document.getElementById('cy').getBoundingClientRect();
+      const p=evt.renderedPosition; const ax=cr.left+p.x, ay=cr.top+p.y;
+      document.getElementById('trash').classList[ ax>=rect.left&&ax<=rect.right&&ay>=rect.top&&ay<=rect.bottom? 'add':'remove']('hovered');
+    });
+    cy.on('free','node', evt => {
+      if(!grab) return;
+      const rect= document.getElementById('trash').getBoundingClientRect();
+      const cr=document.getElementById('cy').getBoundingClientRect();
+      const p=evt.renderedPosition; const ax=cr.left+p.x, ay=cr.top+p.y;
+      if(ax>=rect.left&&ax<=rect.right&&ay>=rect.top&&ay<=rect.bottom) {
+        grab.connectedEdges().remove(); grab.remove();
+      } else saveState();
+      document.getElementById('trash').classList.remove('hovered'); grab=null;
+    });
+  </script>
+</body>
+</html>
