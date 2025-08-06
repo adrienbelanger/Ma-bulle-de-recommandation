@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ma bulle de recommandation - k-NN interactif</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: Verdana, sans-serif;
+      background: linear-gradient(to bottom, #5bc0eb, #20639b);
+      height: 100vh;
+      overflow: hidden;
+      position: relative;
+      opacity: 0;
+      animation: fadeIn 0.5s ease forwards;
+    }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes fadeOut { from { opacity: 1; } to { opacity: 0; } }
+    .fade-out { animation: fadeOut 0.5s ease forwards; }
+    .container {
+      display: flex;
+      height: 100%;
+      padding: 1rem;
+      box-sizing: border-box;
+      position: relative;
+      z-index: 1;
+      gap: 1rem;
+    }
+    .panel {
+      flex: 1;
+      background: rgba(255,255,255,0.1);
+      border-radius: 8px;
+      padding: 1rem;
+      color: #fff;
+      overflow: auto;
+    }
+    h2 { margin-top: 0; font-size: 1.3rem; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td {
+      border: 1px solid rgba(255,255,255,0.3);
+      padding: 0.4rem;
+      text-align: left;
+    }
+    th { background: rgba(255,255,255,0.2); }
+    input[type=range] { width: 100%; }
+    .nav-bubble {
+      position: absolute;
+      top: 1rem;
+      width: 30px;
+      height: 30px;
+      background: rgba(255,255,255,0.2);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      backdrop-filter: blur(6px);
+      transition: background 0.2s;
+      z-index: 2;
+      color: #fff;
+      font-size: 1rem;
+    }
+    .nav-bubble:hover { background: rgba(255,255,255,0.3); }
+    .nav-left { right: 70px; }
+    .nav-right { right: 20px; }
+    .bubble-floating {
+      position: absolute;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.1);
+      animation: floatUp 30s linear infinite;
+      pointer-events: none;
+      backdrop-filter: blur(8px);
+      z-index: 0;
+    }
+    @keyframes floatUp { 0% { bottom: -100px; transform: translateX(0); } 100% { bottom: 110%; transform: translateX(50px); } }
+  </style>
+</head>
+<body>
+  <div class="nav-bubble nav-left" onclick="navigate('page2.html')">◀</div>
+  <div class="nav-bubble nav-right" onclick="navigate('page4.html')">▶</div>
+  <div class="container">
+    <div class="panel" id="panel1">
+      <h2>20 premières lignes</h2>
+      <table><thead><tr><th>Âge</th><th>Vidéo vue</th><th>Catégorie</th></tr></thead><tbody id="data-body"></tbody></table>
+    </div>
+    <div class="panel" id="panel2">
+      <h2>Paramètre k</h2>
+      <input type="range" id="k-slider" min="1" max="15" value="3"/>
+      <div>k = <span id="k-val">3</span></div>
+      <button id="train-btn">Entraîner</button>
+    </div>
+    <div class="panel" id="panel3">
+      <h2>Résultats</h2>
+      <canvas id="barChart" height="150"></canvas>
+      <table style="margin-top:1rem;"><thead><tr><th>Âge</th><th>Vidéo</th><th>Prédiction</th><th>Réel</th><th></th></tr></thead><tbody id="test-body"></tbody></table>
+    </div>
+  </div>
+  <div class="bubble-floating" style="left:10%;width:80px;height:80px;animation-delay:1s;"></div>
+  <div class="bubble-floating" style="left:30%;width:60px;height:60px;animation-delay:5s;"></div>
+  <div class="bubble-floating" style="left:50%;width:100px;height:100px;animation-delay:3s;"></div>
+  <div class="bubble-floating" style="left:70%;width:50px;height:50px;animation-delay:7s;"></div>
+  <div class="bubble-floating" style="left:90%;width:80px;height:80px;animation-delay:4s;"></div>
+  <script>
+    function navigate(url){
+      document.body.classList.add('fade-out');
+      document.body.addEventListener('animationend',()=>window.location.href=url,{once:true});
+    }
+    const titles=[
+      'Découverte d’un monde de blocs',
+      'Exploration d’un jeu d’énigmes',
+      'Recette de crêpes express',
+      'Tutoriel sur la préparation de smoothies',
+      'Présentation des tendances mode été',
+      'Interview d’un créateur de mode',
+      'Mon chat apprend un nouveau tour',
+      'Top 10 des animaux mignons',
+      'Test d’un nouveau jeu de sport',
+      'Vlog : ma journée sportive'
+    ];
+    const categories=['Gaming','Gaming','Cuisine','Cuisine','Mode','Mode','Animaux','Animaux','Sport','Sport'];
+    const dataset=[];
+    for(let i=0;i<50;i++){
+      const idx=i%titles.length;
+      dataset.push({age:10+(i%5),title:titles[idx],category:categories[idx],titleIndex:idx});
+    }
+    const dataBody=document.getElementById('data-body');
+    dataset.slice(0,20).forEach(d=>{
+      const tr=document.createElement('tr');
+      tr.innerHTML=`<td>${d.age}</td><td>${d.title}</td><td>${d.category}</td>`;
+      dataBody.appendChild(tr);
+    });
+    const kSlider=document.getElementById('k-slider');
+    const kVal=document.getElementById('k-val');
+    kSlider.oninput=()=>kVal.textContent=kSlider.value;
+    let chart;
+    document.getElementById('train-btn').onclick=()=>{
+      const k=parseInt(kSlider.value);
+      const shuffled=[...dataset].sort(()=>Math.random()-0.5);
+      const split=Math.floor(shuffled.length*0.8);
+      const trainSet=shuffled.slice(0,split);
+      const testSet=shuffled.slice(split);
+      const cats=[...new Set(dataset.map(d=>d.category))];
+      const stats={}; cats.forEach(c=>stats[c]={correct:0,incorrect:0});
+      const examples=[];
+      testSet.forEach(sample=>{
+        const neighbors=trainSet.map(tr=>({
+          dist:Math.hypot(tr.age-sample.age,tr.titleIndex-sample.titleIndex),
+          category:tr.category
+        })).sort((a,b)=>a.dist-b.dist).slice(0,k);
+        const counts={};
+        neighbors.forEach(n=>counts[n.category]=(counts[n.category]||0)+1);
+        const pred=Object.keys(counts).reduce((a,b)=>counts[a]>counts[b]?a:b);
+        const correct=pred===sample.category;
+        stats[sample.category][correct?'correct':'incorrect']++;
+        if(examples.length<5)examples.push({...sample,pred,correct});
+      });
+      const labels=cats;
+      const correctData=labels.map(c=>stats[c].correct);
+      const incorrectData=labels.map(c=>stats[c].incorrect);
+      if(chart)chart.destroy();
+      chart=new Chart(document.getElementById('barChart'),{
+        type:'bar',
+        data:{labels,datasets:[
+          {label:'Correct',data:correctData,backgroundColor:'rgba(76,175,80,0.5)'},
+          {label:'Incorrect',data:incorrectData,backgroundColor:'rgba(244,67,54,0.5)'}
+        ]},
+        options:{scales:{y:{beginAtZero:true}}}
+      });
+      const testBody=document.getElementById('test-body');
+      testBody.innerHTML='';
+      examples.forEach(ex=>{
+        const row=document.createElement('tr');
+        row.innerHTML=`<td>${ex.age}</td><td>${ex.title}</td><td>${ex.pred}</td><td>${ex.category}</td><td>${ex.correct?'✔':'✖'}</td>`;
+        testBody.appendChild(row);
+      });
+    };
+  </script>
+</body>
+</html>
