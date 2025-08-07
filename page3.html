@@ -14,19 +14,16 @@
     }
     @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
-    .nav-bubble {
+    .nav-bubble { 
       position: absolute; top: 1rem;
-      width: 32px; height: 32px;
-      background: #fff;
-      border-radius: 50%;
-      display: flex; align-items: center; justify-content: center;
-      cursor: pointer; backdrop-filter: blur(6px);
-      transition: background 0.2s;
-      z-index: 10; color: #333; font-size: 1rem;
-      user-select: none;
+      width: 30px; height: 30px; background: rgba(255,255,255,0.2);
+      border-radius: 50%; display: flex; align-items: center;
+      justify-content: center; cursor: pointer;
+      backdrop-filter: blur(6px); transition: background 0.2s;
+      z-index: 2; color: #fff; font-size: 1rem;
     }
-    .nav-bubble:hover { background: #eee; }
-    .nav-left  { right: 80px; }
+    .nav-bubble:hover { background: rgba(255,255,255,0.3); }
+    .nav-left { right: 70px; }
     .nav-right { right: 20px; }
 
     #container {
@@ -100,15 +97,6 @@
       background: #fff;
     }
 
-    #helpBox {
-      position: absolute; top: 3.5rem; right: 2rem;
-      width: 240px; background: #fff;
-      border: 1px solid #ccc; padding: 8px;
-      box-shadow: 0 2px 5px rgba(0,0,0,0.2);
-      display: none; font-size: 14px;
-      z-index: 9;
-    }
-
     .bubble-floating {
       position: absolute; border-radius: 50%;
       background: rgba(255,255,255,0.1);
@@ -125,29 +113,21 @@
   <script src="https://cdn.jsdelivr.net/npm/lz-string@1.4.4/libs/lz-string.min.js"></script>
 </head>
 <body>
+  <!-- Navigation -->
   <div class="nav-bubble nav-left" onclick="navigate('page2.html')">◀</div>
-  <div class="nav-bubble nav-right" onclick="navigate('index.html')">▶</div>
+  <div class="nav-bubble nav-right" onclick="navigate('')">▶</div>
 
   <div id="container">
     <div id="toolbar">
       <button class="shape-btn decision-shape" id="addDecision" title="Ajouter un nœud de décision"></button>
       <button class="shape-btn leaf-shape" id="addLeaf" title="Ajouter un nœud résultat"></button>
-      <button id="catToolBtn">Outil de Catégorisation</button>
-      <button id="help">?</button>
+      
+      
     </div>
     <div id="cy"></div>
     <input id="labelEditor" type="text" />
     <div id="trash" title="Glissez ici pour supprimer"></div>
-    <div id="helpBox">
-      <strong>Contrôles :</strong>
-      <ul style="padding-left:16px; margin:4px 0;">
-        <li>Clique sur le losange pour ajouter un noeud de décision</li>
-        <li>Clique sur le rectangle pour ajouter un noeud résultat</li>
-        <li>Clic droit + glisser pour lier deux noeuds</li>
-        <li>Double-clic pour renommer noeuds et arêtes</li>
-        <li>Glisse un noeud sur la poubelle pour supprimer</li>
-      </ul>
-    </div>
+
   </div>
 
   <!-- Background bubbles -->
@@ -163,12 +143,6 @@
       document.body.addEventListener('animationend', () => window.location.href = url, { once: true });
     }
 
-    document.getElementById('help').addEventListener('click', e => {
-      e.stopPropagation();
-      const box = document.getElementById('helpBox');
-      box.style.display = box.style.display === 'block' ? 'none' : 'block';
-    });
-    document.addEventListener('click', () => document.getElementById('helpBox').style.display = 'none');
 
     const cy = cytoscape({
       container: document.getElementById('cy'),
@@ -235,7 +209,7 @@
     }
     document.getElementById('addDecision').onclick = () => addNode('decision');
     document.getElementById('addLeaf').onclick     = () => addNode('leaf');
-    document.getElementById('catToolBtn').onclick   = () => location.href = 'triage.html';
+    
 
     // Linking logic
     let origin = null, target = null, dragging = false;
