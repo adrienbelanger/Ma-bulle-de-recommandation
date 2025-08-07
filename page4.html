@@ -1,187 +1,128 @@
 <!DOCTYPE html>
-<html lang="fr">
+<html lang="fr-CA">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Ma bulle de recommandation</title>
-  <style>
-    body {
-      margin: 0;
-      padding: 0;
-      font-family: Verdana, sans-serif;
-      background: linear-gradient(to bottom, #5bc0eb, #20639b);
-      height: 100vh;
-      overflow: hidden;
-      position: relative;
-      opacity: 0;
-      animation: fadeIn 0.5s ease forwards;
-    }
-    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-    @keyframes fadeOut { from { opacity: 1; } to { opacity: 0; } }
-    .fade-out { animation: fadeOut 0.5s ease forwards; }
-
-    .container {
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      height: 100%;
-      padding: 2rem;
-      box-sizing: border-box;
-      position: relative;
-      z-index: 1;
-    }
-    .data-panel {
-      background: rgba(255,255,255,0.1);
-      border-radius: 8px;
-      padding: 1rem;
-      color: #fff;
-      overflow-y: auto;
-      margin: auto;
-      width: 80%;
-      max-width: 400px;
-      text-align: center;
-    }
-    .nav-bubble {
-      position: absolute;
-      top: 1rem;
-      width: 30px;
-      height: 30px;
-      background: rgba(255,255,255,0.2);
-      border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      cursor: pointer;
-      backdrop-filter: blur(6px);
-      transition: background 0.2s;
-      z-index: 2;
-      color: #fff;
-      font-size: 1rem;
-    }
-    .nav-bubble:hover { background: rgba(255,255,255,0.3); }
-    .nav-left { right: 70px; }
-    .nav-right { right: 20px; }
-    #trainBtn {
-      background: rgba(255,255,255,0.2);
-      border: none;
-      border-radius: 4px;
-      padding: 0.6rem 1rem;
-      cursor: pointer;
-      backdrop-filter: blur(6px);
-      color: #fff;
-      font-size: 1rem;
-      transition: background 0.2s;
-      outline: none;
-      margin: 1rem 0;
-    }
-    #trainBtn:hover:not(:disabled) { background: rgba(255,255,255,0.3); }
-    #trainBtn:disabled { opacity: 0.5; cursor: default; }
-    table { width: 100%; border-collapse: collapse; margin: 1rem 0; }
-    th, td { border: 1px solid rgba(255,255,255,0.3); padding: 0.5rem; text-align: center; }
-    th { background: rgba(255,255,255,0.2); }
-    .bubble-floating {
-      position: absolute;
-      border-radius: 50%;
-      background: rgba(255,255,255,0.1);
-      animation: floatUp 30s linear infinite;
-      pointer-events: none;
-      backdrop-filter: blur(8px);
-      z-index: 0;
-    }
-    @keyframes floatUp { 0% { bottom: -100px; transform: translateX(0); } 100% { bottom: 110%; transform: translateX(50px); } }
-  </style>
-  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/universal-sentence-encoder@1.4.7/dist/universal-sentence-encoder.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/ml5@1.2.2/dist/ml5.min.js"></script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ma bulle de recommandation</title>
+<style>
+body{margin:0;padding:0;font-family:Verdana,sans-serif;background:linear-gradient(to bottom,#5bc0eb,#20639b);height:100vh;overflow:hidden;position:relative;opacity:0;animation:fadeIn .5s ease forwards}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+@keyframes fadeOut{from{opacity:1}to{opacity:0}}
+.fade-out{animation:fadeOut .5s ease forwards}
+.container{display:flex;justify-content:center;align-items:center;height:100%;padding:2rem;box-sizing:border-box;position:relative;z-index:1}
+.data-panel{background:rgba(255,255,255,.1);border-radius:8px;padding:1rem;color:#fff;overflow-y:auto;margin:auto;width:80%;max-width:500px;text-align:center}
+.nav-bubble{position:absolute;top:1rem;width:30px;height:30px;background:rgba(255,255,255,.2);border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;backdrop-filter:blur(6px);transition:background .2s;z-index:2;color:#fff;font-size:1rem}
+.nav-bubble:hover{background:rgba(255,255,255,.3)}
+.nav-left{right:70px}
+.nav-right{right:20px}
+#trainBtn{background:rgba(255,255,255,.2);border:none;border-radius:4px;padding:.6rem 1.2rem;cursor:pointer;backdrop-filter:blur(6px);color:#fff;font-size:1rem;transition:background .2s;outline:none;margin:1rem 0}
+#trainBtn:hover:not(:disabled){background:rgba(255,255,255,.3)}
+#trainBtn:disabled{opacity:.5;cursor:default}
+table{width:100%;border-collapse:collapse;margin:1rem 0}
+th,td{border:1px solid rgba(255,255,255,.3);padding:.5rem;text-align:center}
+th{background:rgba(255,255,255,.2)}
+.bubble-floating{position:absolute;border-radius:50%;background:rgba(255,255,255,.1);animation:floatUp 30s linear infinite;pointer-events:none;backdrop-filter:blur(8px);z-index:0}
+@keyframes floatUp{0%{bottom:-100px;transform:translateX(0)}100%{bottom:110%;transform:translateX(50px)}}
+</style>
 </head>
 <body>
-  <div class="nav-bubble nav-left" onclick="navigate('page3.html')">◀</div>
-  <div class="nav-bubble nav-right" onclick="navigate('page5.html')">▶</div>
-
-  <div class="bubble-floating" style="left: 10%; width:80px; height:80px; animation-delay:1s;"></div>
-  <div class="bubble-floating" style="left: 30%; width:60px; height:60px; animation-delay:5s;"></div>
-  <div class="bubble-floating" style="left: 50%; width:100px; height:100px; animation-delay:3s;"></div>
-  <div class="bubble-floating" style="left: 70%; width:50px; height:50px; animation-delay:7s;"></div>
-  <div class="bubble-floating" style="left: 90%; width:80px; height:80px; animation-delay:4s;"></div>
-
-  <div class="container">
-    <div class="data-panel">
-      <h2>ML Training Demo</h2>
-      <button id="trainBtn" disabled>Loading model...</button>
-      <div id="status">Please wait</div>
-      <div id="vis"></div>
-      <div id="results"></div>
-    </div>
+<div class="nav-bubble nav-left" onclick="navigate('page3.html')">◀</div>
+<div class="nav-bubble nav-right" onclick="navigate('page5.html')">▶</div>
+<div class="bubble-floating" style="left:10%;width:80px;height:80px;animation-delay:1s"></div>
+<div class="bubble-floating" style="left:30%;width:60px;height:60px;animation-delay:5s"></div>
+<div class="bubble-floating" style="left:50%;width:100px;height:100px;animation-delay:3s"></div>
+<div class="bubble-floating" style="left:70%;width:50px;height:50px;animation-delay:7s"></div>
+<div class="bubble-floating" style="left:90%;width:80px;height:80px;animation-delay:4s"></div>
+<div class="container">
+  <div class="data-panel">
+    <h2>Entraînement</h2>
+    <button id="trainBtn">Appuyer ici pour entraîner le modèle</button>
+    <div id="status">Prêt</div>
+    <div id="results"></div>
   </div>
-
-  <script>
-    function navigate(url) {
-      document.body.classList.add('fade-out');
-      document.body.addEventListener('animationend', () => window.location.href = url, { once: true });
-    }
-  </script>
-  <script>
-    const data = [
-      { age: 7, last: 'Animals', label: 'Cartoons' },
-      { age: 10, last: 'Science', label: 'Experiments' },
-      { age: 8, last: 'Cartoons', label: 'Animals' },
-      { age: 12, last: 'Experiments', label: 'Science' },
-      { age: 9, last: 'Animals', label: 'Experiments' },
-      { age: 11, last: 'Science', label: 'Cartoons' }
-    ];
-    const testData = [
-      { age: 8, last: 'Cartoons', label: 'Animals' },
-      { age: 10, last: 'Science', label: 'Experiments' },
-      { age: 9, last: 'Animals', label: 'Cartoons' }
-    ];
-    let encoder, knn;
-
-    async function initModel() {
-      try {
-        encoder = await use.load();
-        knn = ml5.KNNClassifier();
-        document.getElementById('trainBtn').disabled = false;
-        document.getElementById('trainBtn').textContent = 'Train Model';
-        document.getElementById('status').textContent = 'Ready to train';
-      } catch (e) {
-        document.getElementById('status').textContent = 'Model load failed';
-      }
-    }
-    initModel();
-
-    document.getElementById('trainBtn').addEventListener('click', async () => {
-      const btn = document.getElementById('trainBtn');
-      btn.disabled = true;
-      document.getElementById('status').textContent = 'Training...';
-
-      // Add examples quickly
-      for (const row of data) {
-        const emb = await encoder.embed(`age_${row.age} last_${row.last}`);
-        knn.addExample(emb, row.label);
-      }
-
-      document.getElementById('status').textContent = 'Training complete. Testing...';
-
-      // Show training counts
-      const counts = {};
-      data.forEach(r => counts[r.label] = (counts[r.label]||0)+1);
-      let visHtml = '<h3>Training Data</h3><table><tr><th>Label</th><th>Count</th></tr>';
-      Object.entries(counts).forEach(([l,c]) => visHtml+=`<tr><td>${l}</td><td>${c}</td></tr>`);
-      visHtml += '</table>';
-      document.getElementById('vis').innerHTML = visHtml;
-
-      // Test set
-      let resHtml = '<h3>Test Results</h3><table><tr><th>Age</th><th>Last</th><th>Actual</th><th>Predicted</th></tr>';
-      for (const r of testData) {
-        const emb = await encoder.embed(`age_${r.age} last_${r.last}`);
-        const res = await knn.classify(emb);
-        resHtml += `<tr><td>${r.age}</td><td>${r.last}</td><td>${r.label}</td><td>${res.label}</td></tr>`;
-      }
-      resHtml += '</table>';
-      document.getElementById('results').innerHTML = resHtml;
-
-      document.getElementById('status').textContent = 'Done';
-    });
-  </script>
+</div>
+<script>
+function navigate(u){document.body.classList.add('fade-out');document.body.addEventListener('animationend',()=>location.href=u,{once:true})}
+function tokens(s){return s.toLowerCase().split(/[^a-zàâçéèêëîïôûùüÿñæœ]+/).filter(Boolean)}
+const trainData=[
+{title:'Moments drôles du castor bleu',label:'Dessins'},
+{title:'La course folle du lapin malin',label:'Dessins'},
+{title:'La flaque de boue magique',label:'Dessins'},
+{title:'Le coureur et le coyote rigolo',label:'Dessins'},
+{title:'Aventure au chalet des amis',label:'Dessins'},
+{title:'Blagues du duo farceur',label:'Dessins'},
+{title:'Sauvetage dans la forêt mystique',label:'Dessins'},
+{title:'Patrouille du port joyeux',label:'Dessins'},
+{title:'Fête de danse des chiots',label:'Dessins'},
+{title:'La montagne russe bricolée',label:'Dessins'},
+{title:'Volcan maison avec vinaigre',label:'Expériences'},
+{title:'Fusée au bicarbonate de soude',label:'Expériences'},
+{title:'Réaction pâte à dents géante',label:'Expériences'},
+{title:'Fabriquer du slime étirable',label:'Expériences'},
+{title:'Lait qui change de couleur',label:'Expériences'},
+{title:'Oobleck étrange liquide‑solide',label:'Expériences'},
+{title:'Voiture ballon propulsée',label:'Expériences'},
+{title:'Lampe lave DIY',label:'Expériences'},
+{title:'Pile citron maison',label:'Expériences'},
+{title:'Fontaine menthe et cola',label:'Expériences'},
+{title:'Premiers pas du panda roux',label:'Animaux'},
+{title:'Safari rugissements du lion',label:'Animaux'},
+{title:'Chiens exécutent des tours',label:'Animaux'},
+{title:'Chatons jouent au laser',label:'Animaux'},
+{title:'Sauts spectaculaires des dauphins',label:'Animaux'},
+{title:'Danse des oiseaux tropicaux',label:'Animaux'},
+{title:'Vie secrète des fourmis',label:'Animaux'},
+{title:'Sauvetage d’un manchot',label:'Animaux'},
+{title:'Bain de boue de l’éléphant',label:'Animaux'},
+{title:'Grimpe du panda roux',label:'Animaux'},
+{title:'Le système solaire expliqué',label:'Sciences'},
+{title:'Pourquoi les plantes sont vertes',label:'Sciences'},
+{title:'Physique des montagnes russes',label:'Sciences'},
+{title:'Voyage dans le corps humain',label:'Sciences'},
+{title:'Construire un circuit simple',label:'Sciences'},
+{title:'Cycle de l’eau illustré',label:'Sciences'},
+{title:'Bases du magnétisme',label:'Sciences'},
+{title:'Les états de la matière',label:'Sciences'},
+{title:'Documentaire sur les dinosaures',label:'Sciences'},
+{title:'Introduction à l’électricité',label:'Sciences'},
+{title:'Guide débutant de l’île pixel',label:'Jeux vidéo'},
+{title:'Course folle de kart arctique',label:'Jeux vidéo'},
+{title:'Construction d’un monde en blocs',label:'Jeux vidéo'},
+{title:'Défi danse rythmique arcade',label:'Jeux vidéo'},
+{title:'Stratégie conquête médiévale',label:'Jeux vidéo'},
+{title:'Aventure RPG forêt enchantée',label:'Jeux vidéo'},
+{title:'Match de soccer virtuel',label:'Jeux vidéo'},
+{title:'Puzzle plateforme spatiale',label:'Jeux vidéo'},
+{title:'Course à obstacles néon',label:'Jeux vidéo'},
+{title:'Simulation ferme canadienne',label:'Jeux vidéo'}
+]
+const testData=[
+{title:'Bataille de robots rétro',label:'Jeux vidéo'},
+{title:'Expérience œuf rebondissant',label:'Expériences'},
+{title:'Pourquoi avons‑nous des saisons',label:'Sciences'},
+{title:'Premiers pas du koala',label:'Animaux'}
+]
+const recVid={Dessins:'Aventure au chalet des amis',Expériences:'Réaction pâte à dents géante',Animaux:'Premiers pas du panda roux',Sciences:'Le système solaire expliqué','Jeux vidéo':'Construction d’un monde en blocs'}
+let vocab=[],word2idx={},centroids={},centroidNorm={}
+function buildVocab(){for(const r of trainData){for(const w of tokens(r.title)){if(word2idx[w]===undefined){word2idx[w]=vocab.length;vocab.push(w)}}}}
+function vecFromTitle(t){const v=new Uint8Array(vocab.length);for(const w of tokens(t)){const i=word2idx[w];if(i!==undefined)v[i]=1}return v}
+function cosine(a,b,nB){let dot=0,nA=0;for(let i=0;i<a.length;i++){if(a[i]){nA++;if(b[i])dot++}}if(nA===0||nB===0)return 0;return dot/Math.sqrt(nA*nB)}
+function trainModel(){buildVocab();const sums={},counts={};for(const r of trainData){const v=vecFromTitle(r.title);const lab=r.label;if(!sums[lab]){sums[lab]=new Float32Array(vocab.length);counts[lab]=0}for(let i=0;i<v.length;i++){sums[lab][i]+=v[i]}counts[lab]++}for(const lab in sums){for(let i=0;i<vocab.length;i++){sums[lab][i]/=counts[lab]}centroids[lab]=sums[lab];let n=0;for(let i=0;i<vocab.length;i++){if(centroids[lab][i]>0)n++}centroidNorm[lab]=Math.sqrt(n)}return counts}
+function predict(t){const v=vecFromTitle(t);let best=null,bestScore=-1;for(const lab in centroids){const s=cosine(v,centroids[lab],centroidNorm[lab]);if(s>bestScore){bestScore=s;best=lab}}return best}
+document.getElementById('trainBtn').addEventListener('click',()=>{
+ document.getElementById('trainBtn').disabled=true
+ document.getElementById('status').textContent='Entraînement...'
+ setTimeout(()=>{
+  trainModel()
+  document.getElementById('status').textContent='Génération des recommandations...'
+  let res='<h3>Suggestions après test</h3><table><tr><th>Titre visionné</th><th>Vidéo suggérée</th><th></th></tr>'
+  for(const r of testData){const cat=predict(r.title);const ok=cat===r.label?'✅':'❌';res+=`<tr><td>${r.title}</td><td>${recVid[cat]||'Aucune'}</td><td>${ok}</td></tr>`}
+  res+='</table>'
+  document.getElementById('results').innerHTML=res
+  document.getElementById('status').textContent='Terminé'
+  document.getElementById('trainBtn').disabled=false
+ },800)
+})
+</script>
 </body>
 </html>
