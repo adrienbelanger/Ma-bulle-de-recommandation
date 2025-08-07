@@ -1,79 +1,182 @@
-<!-- This page is used for testing the model. -->
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Ma bulle de recommandation</title>
   <style>
-    body { margin: 0; padding: 0; font-family: Verdana, sans-serif;
+    body {
+      margin: 0; padding: 0; font-family: Verdana, sans-serif;
       background: linear-gradient(to bottom, #5bc0eb, #20639b);
       height: 100vh; overflow: hidden; position: relative;
-      opacity: 0; animation: fadeIn 0.5s ease forwards; }
+      display: flex; flex-direction: column; align-items: center;
+      opacity: 0; animation: fadeIn 0.5s ease forwards;
+    }
     @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
     @keyframes fadeOut { from { opacity: 1; } to { opacity: 0; } }
     .fade-out { animation: fadeOut 0.5s ease forwards; }
 
-    .container { padding: 2rem; box-sizing: border-box;
-      height: 100%; position: relative; z-index: 1; }
-    .panel { background: rgba(255,255,255,0.1);
-      border-radius: 8px; padding: 1rem;
-      color: #fff; overflow-y: auto;
-      height: calc(100% - 2rem); }
+    h1 { color: white; margin-top: 1rem; }
 
-    h2 { margin-top: 0; font-size: 1.5rem; }
-    table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
-    th, td { border: 1px solid rgba(255,255,255,0.3);
-      padding: 0.5rem; text-align: left; }
-    th { background: rgba(255,255,255,0.2); }
-    .clean-btn { background: rgba(255,255,255,0.2);
-      border: none; padding: 0.3rem 0.6rem; border-radius: 4px;
-      color: #fff; cursor: pointer; transition: background 0.2s; }
-    .clean-btn:hover { background: rgba(255,255,255,0.3); }
+    .content {
+      flex: 1;
+      display: flex;
+      padding: 1rem;
+      box-sizing: border-box;
+      width: 100%;
+      justify-content: center;
+      align-items: stretch;
+      gap: 1rem;
+    }
 
-    @keyframes fadeOutRow { from { opacity: 1; height: auto; }
-      to { opacity: 0; height: 0; padding: 0; margin: 0; } }
-    .fade-out-row { animation: fadeOutRow 0.5s ease forwards; }
+    .panel {
+      flex: 1;
+      background: rgba(255,255,255,0.1);
+      border-radius: 8px;
+      padding: 1rem;
+      color: white;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
 
-    .nav-bubble { position: absolute; top: 1rem;
-      width: 30px; height: 30px; background: rgba(255,255,255,0.2);
-      border-radius: 50%; display: flex; align-items: center;
-      justify-content: center; cursor: pointer;
-      backdrop-filter: blur(6px); transition: background 0.2s;
-      z-index: 2; color: #fff; font-size: 1rem; }
+    #cy {
+      flex: 1;
+      background: #fff;
+      border-radius: 8px;
+    }
+
+    .choices button {
+      margin: 0.3rem 0;
+      padding: 0.5rem;
+      background: rgba(255,255,255,0.2);
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    .choices button:hover {
+      background: rgba(255,255,255,0.3);
+    }
+    .counter {
+      margin-top: 1rem;
+      font-size: 1.2rem;
+    }
+
+    .nav-bubble {
+      position: absolute; top: 1rem;
+      width: 30px; height: 30px;
+      background: rgba(255,255,255,0.2);
+      border-radius: 50%; display: flex;
+      align-items: center; justify-content: center;
+      cursor: pointer; backdrop-filter: blur(6px);
+      transition: background 0.2s;
+      z-index: 2; color: #fff; font-size: 1rem;
+    }
     .nav-bubble:hover { background: rgba(255,255,255,0.3); }
     .nav-left { right: 70px; }
     .nav-right { right: 20px; }
 
-    .bubble-floating { position: absolute; border-radius: 50%;
+    .bubble-floating {
+      position: absolute; border-radius: 50%;
       background: rgba(255,255,255,0.1);
       animation: floatUp 30s linear infinite;
       pointer-events: none; backdrop-filter: blur(8px);
-      z-index: 0; }
-    @keyframes floatUp { 0% { bottom: -100px; transform: translateX(0);} 
-      100% { bottom: 110%; transform: translateX(50px);} }
+      z-index: 0;
+    }
+    @keyframes floatUp {
+      0% { bottom: -100px; transform: translateX(0); }
+      100% { bottom: 110%; transform: translateX(50px); }
+    }
   </style>
+  <script src="https://unpkg.com/cytoscape@3.32.1/dist/cytoscape.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/lz-string@1.4.4/libs/lz-string.min.js"></script>
 </head>
 <body>
-  <!-- Navigation -->
   <div class="nav-bubble nav-left" onclick="navigate('page4.html')">◀</div>
   <div class="nav-bubble nav-right" onclick="navigate('page6.html')">▶</div>
-
-  <!-- Background bubbles -->
-  <div class="bubble-floating" style="left:10%;width:80px;height:80px;animation-delay:1s;"></div>
-  <div class="bubble-floating" style="left:30%;width:60px;height:60px;animation-delay:5s;"></div>
-  <div class="bubble-floating" style="left:50%;width:100px;height:100px;animation-delay:3s;"></div>
-  <div class="bubble-floating" style="left:70%;width:50px;height:50px;animation-delay:9s;"></div>
-  <div class="bubble-floating" style="left:90%;width:80px;height:80px;animation-delay:4s;"></div>
-<div class="bubble-floating" style="left:45%;width:100px;height:100px;animation-delay:12s;"></div>
-  <div class="bubble-floating" style="left:20%;width:50px;height:50px;animation-delay:17s;"></div>
-  <div class="bubble-floating" style="left:60%;width:100px;height:100px;animation-delay:20s;"></div>
+  <h1>Vidéo</h1>
+  <div class="content">
+    <div class="panel">
+      <h2>Modèle Entraîné</h2>
+      <div id="model-pred">Suggestion: <em>(aucune)</em></div>
+      <div class="counter">✅: <span id="model-correct">0</span></div>
+    </div>
+    <div class="panel">
+      <h2>Arbre de Décision</h2>
+      <div id="cy"></div>
+      <div class="choices">
+        <button onclick="vote('A')">Choix A</button>
+        <button onclick="vote('B')">Choix B</button>
+        <button onclick="vote('C')">Choix C</button>
+        <button onclick="vote('D')">Choix D</button>
+      </div>
+      <div class="counter">✅: <span id="user-correct">0</span></div>
+    </div>
+  </div>
+  <div class="bubble-floating" style="left:10%;width:80px;height:80px;animation-delay:1s"></div>
+  <div class="bubble-floating" style="left:30%;width:60px;height:60px;animation-delay:5s"></div>
+  <div class="bubble-floating" style="left:50%;width:100px;height:100px;animation-delay:3s"></div>
+  <div class="bubble-floating" style="left:70%;width:50px;height:50px;animation-delay:7s"></div>
+  <div class="bubble-floating" style="left:90%;width:80px;height:80px;animation-delay:4s"></div>
 
   <script>
     function navigate(url) {
       document.body.classList.add('fade-out');
       const dest = url + location.hash;
       document.body.addEventListener('animationend', () => window.location.href = dest, { once: true });
+    }
+
+    // Load decision tree from URL
+    const cy = cytoscape({
+      container: document.getElementById('cy'),
+      elements: [],
+      style: [
+        { selector: 'node', style: {
+            'label': 'data(label)', 'text-valign': 'center', 'text-halign': 'center',
+            'color': '#fff', 'width': 'label', 'height': 50,
+            'background-color': '#666'
+          }
+        },
+        { selector: '.decision', style: {
+            'shape': 'diamond', 'background-color': '#4CAF50'
+          }
+        },
+        { selector: '.leaf', style: {
+            'shape': 'roundrectangle', 'background-color': '#2196F3'
+          }
+        },
+        { selector: 'edge', style: {
+            'width': 2, 'line-color': '#000', 'target-arrow-shape': 'triangle',
+            'target-arrow-color': '#000', 'arrow-scale': 1.2, 'curve-style': 'bezier',
+            'label': 'data(label)', 'text-background-opacity': 1,
+            'text-background-color': '#fff', 'text-background-shape': 'roundrectangle',
+            'text-background-padding': 2, 'font-size': 12, 'text-rotation': 'autorotate'
+          }
+        }
+      ],
+      layout: { name: 'breadthfirst' }
+    });
+    function loadTree() {
+      const hash = location.hash.slice(1);
+      if (!hash) return;
+      try {
+        const elements = JSON.parse(LZString.decompressFromEncodedURIComponent(hash));
+        cy.add(elements);
+      } catch (e) { console.error('Failed to load tree from hash:', e); }
+    }
+    loadTree();
+
+    // Dummy choices & counters
+    let modelCorrect = 0, userCorrect = 0;
+    function vote(choice) {
+      const isCorrect = Math.random() < 0.5;
+      if (isCorrect) userCorrect++;
+      document.getElementById('user-correct').textContent = userCorrect;
+      // Simulate model prediction and update its counter if correct
+      const modelIsCorrect = Math.random() < 0.5;
+      if (modelIsCorrect) modelCorrect++;
+      document.getElementById('model-correct').textContent = modelCorrect;
     }
   </script>
 </body>
