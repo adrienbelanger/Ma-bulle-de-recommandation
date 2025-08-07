@@ -42,7 +42,11 @@ th{background:rgba(255,255,255,.2)}
   </div>
 </div>
 <script>
-function navigate(u){document.body.classList.add('fade-out');document.body.addEventListener('animationend',()=>location.href=u,{once:true})}
+function navigate(u){
+ document.body.classList.add('fade-out');
+ const dest=u+location.hash;
+ document.body.addEventListener('animationend',()=>location.href=dest,{once:true})
+}
 function tokens(s){return s.toLowerCase().split(/[^a-zàâçéèêëîïôûùüÿñæœ]+/).filter(Boolean)}
 const trainData=[
 {title:'Moments drôles du castor bleu',label:'Dessins'},

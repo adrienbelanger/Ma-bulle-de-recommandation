@@ -131,7 +131,8 @@
   <script>
     function navigate(url) {
       document.body.classList.add('fade-out');
-      document.body.addEventListener('animationend', () => window.location.href = url, { once: true });
+      const dest = url + location.hash;
+      document.body.addEventListener('animationend', () => window.location.href = dest, { once: true });
     }
     const questions = [
       { age: 11, watched: 'Découverte d’un monde de blocs', category: 'Jeux', options: ['Top des nouveautés ludiques','Recette facile de gâteaux','Daily vlog scolaire','Astuces de soins pour animaux'] },

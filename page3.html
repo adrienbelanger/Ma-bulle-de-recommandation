@@ -141,8 +141,10 @@
 
   <script>
     function navigate(url) {
+      saveState();
       document.body.classList.add('fade-out');
-      document.body.addEventListener('animationend', () => window.location.href = url, { once: true });
+      const dest = url + location.hash;
+      document.body.addEventListener('animationend', () => window.location.href = dest, { once: true });
     }
 
 
