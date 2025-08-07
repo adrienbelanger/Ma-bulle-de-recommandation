@@ -16,36 +16,31 @@
       opacity: 0;
       animation: fadeIn 0.5s ease forwards;
     }
-    /* Fade animations for page transitions */
-    @keyframes fadeIn {
-      from { opacity: 0; }
-      to { opacity: 1; }
-    }
-    @keyframes fadeOut {
-      from { opacity: 1; }
-      to { opacity: 0; }
-    }
-    .fade-out {
-      animation: fadeOut 0.5s ease forwards;
-    }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes fadeOut { from { opacity: 1; } to { opacity: 0; } }
+    .fade-out { animation: fadeOut 0.5s ease forwards; }
+
     .container {
       display: flex;
+      justify-content: center;
+      align-items: center;
       height: 100%;
       padding: 2rem;
       box-sizing: border-box;
       position: relative;
       z-index: 1;
     }
-    .quiz-panel, .data-panel {
+    .data-panel {
       background: rgba(255,255,255,0.1);
       border-radius: 8px;
       padding: 1rem;
       color: #fff;
-      overflow: hidden;
+      overflow-y: auto;
+      margin: auto;
+      width: 80%;
+      max-width: 400px;
+      text-align: center;
     }
-    .quiz-panel { flex: 1; margin-right: 1rem; }
-    .data-panel { flex: 1; margin-left: 1rem; overflow-y: auto; }
-    /* Navigation bubbles */
     .nav-bubble {
       position: absolute;
       top: 1rem;
@@ -66,29 +61,24 @@
     .nav-bubble:hover { background: rgba(255,255,255,0.3); }
     .nav-left { right: 70px; }
     .nav-right { right: 20px; }
-    h2 { margin-top: 0; font-size: 1.5rem; }
-    .question { margin: 1rem 0; font-size: 1.2rem; min-height: 3rem; }
-    .question.fade { animation: fadeInUp 0.5s ease both; }
-    .options button {
-      display: block;
-      margin: 0.5rem 0;
-      padding: 0.6rem 1rem;
+    #trainBtn {
+      background: rgba(255,255,255,0.2);
       border: none;
       border-radius: 4px;
+      padding: 0.6rem 1rem;
       cursor: pointer;
-      background: rgba(255,255,255,0.2);
+      backdrop-filter: blur(6px);
       color: #fff;
       font-size: 1rem;
       transition: background 0.2s;
-      animation: fadeInUp 0.5s ease both;
+      outline: none;
+      margin: 1rem 0;
     }
-    .options button:hover { background: rgba(255,255,255,0.3); }
-    table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
-    th, td { border: 1px solid rgba(255,255,255,0.3); padding: 0.5rem; text-align: left; }
+    #trainBtn:hover:not(:disabled) { background: rgba(255,255,255,0.3); }
+    #trainBtn:disabled { opacity: 0.5; cursor: default; }
+    table { width: 100%; border-collapse: collapse; margin: 1rem 0; }
+    th, td { border: 1px solid rgba(255,255,255,0.3); padding: 0.5rem; text-align: center; }
     th { background: rgba(255,255,255,0.2); }
-    @keyframes fadeInUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
-    @keyframes rowFadeIn { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: translateX(0); } }
-    .row-fade-in { animation: rowFadeIn 0.5s ease both; }
     .bubble-floating {
       position: absolute;
       border-radius: 50%;
@@ -100,25 +90,98 @@
     }
     @keyframes floatUp { 0% { bottom: -100px; transform: translateX(0); } 100% { bottom: 110%; transform: translateX(50px); } }
   </style>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.14.0/dist/tf.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/universal-sentence-encoder@1.4.7/dist/universal-sentence-encoder.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/ml5@3.5.0/dist/ml5.min.js"></script>
 </head>
 <body>
-  <!-- Navigation bubbles -->
   <div class="nav-bubble nav-left" onclick="navigate('page3.html')">◀</div>
   <div class="nav-bubble nav-right" onclick="navigate('page5.html')">▶</div>
 
-  
-  <!-- Background bubbles -->
   <div class="bubble-floating" style="left: 10%; width:80px; height:80px; animation-delay:1s;"></div>
   <div class="bubble-floating" style="left: 30%; width:60px; height:60px; animation-delay:5s;"></div>
   <div class="bubble-floating" style="left: 50%; width:100px; height:100px; animation-delay:3s;"></div>
   <div class="bubble-floating" style="left: 70%; width:50px; height:50px; animation-delay:7s;"></div>
   <div class="bubble-floating" style="left: 90%; width:80px; height:80px; animation-delay:4s;"></div>
 
+  <div class="container">
+    <div class="data-panel">
+      <h2>ML Training Demo</h2>
+      <button id="trainBtn" disabled>Loading model...</button>
+      <div id="status">Please wait</div>
+      <div id="vis"></div>
+      <div id="results"></div>
+    </div>
+  </div>
+
   <script>
     function navigate(url) {
       document.body.classList.add('fade-out');
       document.body.addEventListener('animationend', () => window.location.href = url, { once: true });
     }
+  </script>
+  <script>
+    const data = [
+      { age: 7, last: 'Animals', label: 'Cartoons' },
+      { age: 10, last: 'Science', label: 'Experiments' },
+      { age: 8, last: 'Cartoons', label: 'Animals' },
+      { age: 12, last: 'Experiments', label: 'Science' },
+      { age: 9, last: 'Animals', label: 'Experiments' },
+      { age: 11, last: 'Science', label: 'Cartoons' }
+    ];
+    const testData = [
+      { age: 8, last: 'Cartoons', label: 'Animals' },
+      { age: 10, last: 'Science', label: 'Experiments' },
+      { age: 9, last: 'Animals', label: 'Cartoons' }
+    ];
+    let encoder, knn;
+
+    async function initModel() {
+      try {
+        encoder = await use.load();
+        knn = ml5.KNNClassifier();
+        document.getElementById('trainBtn').disabled = false;
+        document.getElementById('trainBtn').textContent = 'Train Model';
+        document.getElementById('status').textContent = 'Ready to train';
+      } catch (e) {
+        document.getElementById('status').textContent = 'Model load failed';
+      }
+    }
+    initModel();
+
+    document.getElementById('trainBtn').addEventListener('click', async () => {
+      const btn = document.getElementById('trainBtn');
+      btn.disabled = true;
+      document.getElementById('status').textContent = 'Training...';
+
+      // Add examples quickly
+      for (const row of data) {
+        const emb = await encoder.embed(`age_${row.age} last_${row.last}`);
+        knn.addExample(emb, row.label);
+      }
+
+      document.getElementById('status').textContent = 'Training complete. Testing...';
+
+      // Show training counts
+      const counts = {};
+      data.forEach(r => counts[r.label] = (counts[r.label]||0)+1);
+      let visHtml = '<h3>Training Data</h3><table><tr><th>Label</th><th>Count</th></tr>';
+      Object.entries(counts).forEach(([l,c]) => visHtml+=`<tr><td>${l}</td><td>${c}</td></tr>`);
+      visHtml += '</table>';
+      document.getElementById('vis').innerHTML = visHtml;
+
+      // Test set
+      let resHtml = '<h3>Test Results</h3><table><tr><th>Age</th><th>Last</th><th>Actual</th><th>Predicted</th></tr>';
+      for (const r of testData) {
+        const emb = await encoder.embed(`age_${r.age} last_${r.last}`);
+        const res = await knn.classify(emb);
+        resHtml += `<tr><td>${r.age}</td><td>${r.last}</td><td>${r.label}</td><td>${res.label}</td></tr>`;
+      }
+      resHtml += '</table>';
+      document.getElementById('results').innerHTML = resHtml;
+
+      document.getElementById('status').textContent = 'Done';
+    });
   </script>
 </body>
 </html>
