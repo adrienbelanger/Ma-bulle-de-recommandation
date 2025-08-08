@@ -93,14 +93,6 @@
   <div class="bubble-floating" style="width: 60px; height: 60px; left: 50%; animation-delay: 2s;">👍</div>
   <div class="bubble-floating" style="width: 40px; height: 40px; left: 70%; animation-delay: 7s;">❤️</div>
   <div class="bubble-floating" style="width: 60px; height: 60px; left: 85%; animation-delay: 3s;">👍</div>
-  <script>
-    document.getElementById('start-btn').addEventListener('click', () => {
-      document.body.classList.add('fade-out');
-      document.body.addEventListener('animationend', () => {
-        const target = 'page1.html' + location.hash;
-        window.location.href = target;
-      }, { once: true });
-    });
-  </script>
+    <script type="module" src="./src/main.js"></script>
 </body>
 </html>
