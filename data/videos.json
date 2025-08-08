@@ -1,0 +1,8 @@
+[
+  {"id":1,"title":"Moments drôles du castor bleu","tags":["dessins","humour"],"category":"Dessins","views":1000,"likes":800},
+  {"id":2,"title":"Volcan maison avec vinaigre","tags":["expérience","science"],"category":"Expériences","views":500,"likes":450},
+  {"id":3,"title":"Premiers pas du panda roux","tags":["animaux"],"category":"Animaux","views":800,"likes":700},
+  {"id":4,"title":"Le système solaire expliqué","tags":["science"],"category":"Sciences","views":1200,"likes":1100},
+  {"id":5,"title":"Construction d’un monde en blocs","tags":["jeux vidéo","construction"],"category":"Jeux vidéo","views":1500,"likes":1200}
+
+]

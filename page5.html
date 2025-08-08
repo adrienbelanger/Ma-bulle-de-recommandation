@@ -110,6 +110,7 @@
   </style>
   <script src="https://unpkg.com/cytoscape@3.32.1/dist/cytoscape.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/lz-string@1.4.4/libs/lz-string.min.js"></script>
+  <script src="rec.js"></script>
 </head>
 <body>
   <div class="nav-bubble nav-left" onclick="navigate('page4.html')">◀</div>
@@ -120,19 +121,15 @@
       <h2>Modèle Entraîné</h2>
       <div id="model-pred">Suggestion: <em>(aucune)</em></div>
       <div class="counter">✅: <span id="model-correct">0</span></div>
+      <div id="model-metrics"></div>
     </div>
     <div class="panel">
       <h2>Arbre de Décision</h2>
       <div id="cy"></div>
-      
-      <div class="choices">
-        <button onclick="vote('Dessins')">Dessins</button>
-        <button onclick="vote('Expériences')">Expériences</button>
-        <button onclick="vote('Animaux')">Animaux</button>
-        <button onclick="vote('Sciences')">Sciences</button>
-        <button onclick="vote('Jeux vidéo')">Jeux vidéo</button>
-      </div>
-      <div class="counter">✅: <span id="user-correct">0</span></div>
+
+      <div class="choices"></div>
+      <div class="counter">✅: <span id="tree-correct">0</span></div>
+      <div id="tree-metrics"></div>
     </div>
   </div>
   <div class="bubble-floating" style="left:10%;width:80px;height:80px;animation-delay:1s"></div>
@@ -141,52 +138,7 @@
   <div class="bubble-floating" style="left:70%;width:50px;height:50px;animation-delay:7s"></div>
   <div class="bubble-floating" style="left:90%;width:80px;height:80px;animation-delay:4s"></div>
 
-  <script>
-    function navigate(url) {
-      document.body.classList.add('fade-out');
-      const dest = url + location.hash;
-      document.body.addEventListener('animationend', () => window.location.href = dest, { once: true });
-    }
 
-    // Load decision tree from URL
-    const cy = cytoscape({
-      container: document.getElementById('cy'),
-      elements: [],
-      style: [
-        { selector: 'node', style: {
-            'label': 'data(label)', 'text-valign': 'center', 'text-halign': 'center',
-            'color': '#fff', 'width': 'label', 'height': 50,
-            'background-color': '#666'
-          }
-        },
-        { selector: '.decision', style: {
-            'shape': 'diamond', 'background-color': '#4CAF50'
-          }
-        },
-        { selector: '.leaf', style: {
-            'shape': 'roundrectangle', 'background-color': '#2196F3'
-          }
-        },
-        { selector: 'edge', style: {
-            'width': 2, 'line-color': '#000', 'target-arrow-shape': 'triangle',
-            'target-arrow-color': '#000', 'arrow-scale': 1.2, 'curve-style': 'bezier',
-            'label': 'data(label)', 'text-background-opacity': 1,
-            'text-background-color': '#fff', 'text-background-shape': 'roundrectangle',
-            'text-background-padding': 2, 'font-size': 12, 'text-rotation': 'autorotate'
-          }
-        }
-      ],
-      layout: { name: 'breadthfirst' }
-    });
-    function loadTree() {
-      const hash = location.hash.slice(1);
-      if (!hash) return;
-      try {
-        const elements = JSON.parse(LZString.decompressFromEncodedURIComponent(hash));
-        cy.add(elements);
-      } catch (e) { console.error('Failed to load tree from hash:', e); }
-    }
-    loadTree();
 
     // --- Données d'entraînement et modèle ---
     function tokens(s){return s.toLowerCase().split(/[^a-zàâçéèêëîïôûùüÿñæœ]+/).filter(Boolean)}
@@ -277,14 +229,39 @@
       const suggestion=videoTitles[vid]||'Aucune';
       document.getElementById('model-pred').innerHTML=`Suggestion : <strong>${suggestion}</strong>`;
       if(cat===t.label){modelCorrect++;document.getElementById('model-correct').textContent=modelCorrect;}
+
     }
-    function vote(cat){
-      if(currentTest>=testData.length)return;
-      const t=testData[currentTest];
-      if(cat===t.label){userCorrect++;document.getElementById('user-correct').textContent=userCorrect;}
-      currentTest++;
-      showTest();
+  ],
+  layout: { name: 'breadthfirst' }
+});
+
+
+function loadTree(){
+  let raw = localStorage.getItem('decisionTree');
+  if(!raw){
+    const hash = location.hash.slice(1);
+    if(hash) raw = hash;
+  }
+  if(!raw) return;
+  try{
+    const elements = JSON.parse(LZString.decompressFromEncodedURIComponent(raw));
+    cy.add(elements);
+  }catch(e){
+    console.error('Failed to load tree', e);
+  }
+}
+loadTree();
+
+function predictTree(video){
+  if(cy.nodes().length===0) return null;
+  let node = cy.nodes().filter(n=>n.indegree()===0)[0];
+  while(node){
+    if(node.hasClass('leaf')){
+      const vid = data.videos.find(v=>v.title===node.data('label'));
+      return vid?vid.id:null;
     }
+
   </script>
+
 </body>
 </html>

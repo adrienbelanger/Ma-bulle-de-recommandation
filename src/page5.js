@@ -1,0 +1,138 @@
+function navigate(url) {
+  document.body.classList.add('fade-out');
+  const dest = url + location.hash;
+  document.body.addEventListener('animationend', () => window.location.href = dest, { once: true });
+}
+
+// Load decision tree from URL
+const cy = cytoscape({
+  container: document.getElementById('cy'),
+  elements: [],
+  style: [
+    { selector: 'node', style: {
+        'label': 'data(label)', 'text-valign': 'center', 'text-halign': 'center',
+        'color': '#fff', 'width': 'label', 'height': 50,
+        'background-color': '#666'
+      }
+    },
+    { selector: '.decision', style: {
+        'shape': 'diamond', 'background-color': '#4CAF50'
+      }
+    },
+    { selector: '.leaf', style: {
+        'shape': 'roundrectangle', 'background-color': '#2196F3'
+      }
+    },
+    { selector: 'edge', style: {
+        'width': 2, 'line-color': '#000', 'target-arrow-shape': 'triangle',
+        'target-arrow-color': '#000', 'arrow-scale': 1.2, 'curve-style': 'bezier',
+        'label': 'data(label)', 'text-background-opacity': 1,
+        'text-background-color': '#fff', 'text-background-shape': 'roundrectangle',
+        'text-background-padding': 2, 'font-size': 12, 'text-rotation': 'autorotate'
+      }
+    }
+  ],
+  layout: { name: 'breadthfirst' }
+});
+function loadTree() {
+  const hash = location.hash.slice(1);
+  if (!hash) return;
+  try {
+    const elements = JSON.parse(LZString.decompressFromEncodedURIComponent(hash));
+    cy.add(elements);
+  } catch (e) { console.error('Failed to load tree from hash:', e); }
+}
+loadTree();
+
+// --- Données d'entraînement et modèle ---
+function tokens(s){return s.toLowerCase().split(/[^a-zàâçéèêëîïôûùüÿñæœ]+/).filter(Boolean)}
+const trainData=[
+  {title:'Moments drôles du castor bleu',label:'Dessins'},
+  {title:'La course folle du lapin malin',label:'Dessins'},
+  {title:'La flaque de boue magique',label:'Dessins'},
+  {title:'Le coureur et le coyote rigolo',label:'Dessins'},
+  {title:'Aventure au chalet des amis',label:'Dessins'},
+  {title:'Blagues du duo farceur',label:'Dessins'},
+  {title:'Sauvetage dans la forêt mystique',label:'Dessins'},
+  {title:'Patrouille du port joyeux',label:'Dessins'},
+  {title:'Fête de danse des chiots',label:'Dessins'},
+  {title:'La montagne russe bricolée',label:'Dessins'},
+  {title:'Volcan maison avec vinaigre',label:'Expériences'},
+  {title:'Fusée au bicarbonate de soude',label:'Expériences'},
+  {title:'Réaction pâte à dents géante',label:'Expériences'},
+  {title:'Fabriquer du slime étirable',label:'Expériences'},
+  {title:'Lait qui change de couleur',label:'Expriences'},
+  {title:'Oobleck étrange liquide‑solide',label:'Expériences'},
+  {title:'Voiture ballon propulsée',label:'Expériences'},
+  {title:'Lampe lave DIY',label:'Expériences'},
+  {title:'Pile citron maison',label:'Expériences'},
+  {title:'Fontaine menthe et cola',label:'Expériences'},
+  {title:'Premiers pas du panda roux',label:'Animaux'},
+  {title:'Safari rugissements du lion',label:'Animaux'},
+  {title:'Chiens exécutent des tours',label:'Animaux'},
+  {title:'Chatons jouent au laser',label:'Animaux'},
+  {title:'Sauts spectaculaires des dauphins',label:'Animaux'},
+  {title:'Danse des oiseaux tropicaux',label:'Animaux'},
+  {title:'Vie secrète des fourmis',label:'Animaux'},
+  {title:'Sauvetage d’un manchot',label:'Animaux'},
+  {title:'Bain de boue de l’éléphant',label:'Animaux'},
+  {title:'Grimpe du panda roux',label:'Animaux'},
+  {title:'Le système solaire expliqué',label:'Sciences'},
+  {title:'Pourquoi les plantes sont vertes',label:'Sciences'},
+  {title:'Physique des montagnes russes',label:'Sciences'},
+  {title:'Voyage dans le corps humain',label:'Sciences'},
+  {title:'Construire un circuit simple',label:'Sciences'},
+  {title:'Cycle de l’eau illustré',label:'Sciences'},
+  {title:'Bases du magnétisme',label:'Sciences'},
+  {title:'Les états de la matière',label:'Sciences'},
+  {title:'Documentaire sur les dinosaures',label:'Sciences'},
+  {title:'Introduction à l’électricité',label:'Sciences'},
+  {title:'Guide débutant de l’île pixel',label:'Jeux vidéo'},
+  {title:'Course folle de kart arctique',label:'Jeux vidéo'},
+  {title:'Construction d’un monde en blocs',label:'Jeux vidéo'},
+  {title:'Défi danse rythmique arcade',label:'Jeux vidéo'},
+  {title:'Stratégie conquête médiévale',label:'Jeux vidéo'},
+  {title:'Aventure RPG forêt enchantée',label:'Jeux vidéo'},
+  {title:'Match de soccer virtuel',label:'Jeux vidéo'},
+  {title:'Puzzle plateforme spatiale',label:'Jeux vidéo'},
+  {title:'Course à obstacles néon',label:'Jeux vidéo'},
+  {title:'Simulation ferme canadienne',label:'Jeux vidéo'}
+];
+const testData=[
+  {title:'Bataille de robots rétro',label:'Jeux vidéo'},
+  {title:'Expérience œuf rebondissant',label:'Expériences'},
+  {title:'Pourquoi avons‑nous des saisons',label:'Sciences'},
+  {title:'Premiers pas du koala',label:'Animaux'}
+];
+const recVid={Dessins:'Aventure au chalet des amis',Expériences:'Réaction pâte à dents géante',Animaux:'Premiers pas du panda roux',Sciences:'Le système solaire expliqué','Jeux vidéo':'Construction d’un monde en blocs'};
+let vocab=[],word2idx={},centroids={},centroidNorm={};
+function buildVocab(){for(const r of trainData){for(const w of tokens(r.title)){if(word2idx[w]===undefined){word2idx[w]=vocab.length;vocab.push(w)}}}}
+function vecFromTitle(t){const v=new Uint8Array(vocab.length);for(const w of tokens(t)){const i=word2idx[w];if(i!==undefined)v[i]=1}return v}
+function cosine(a,b,nB){let dot=0,nA=0;for(let i=0;i<a.length;i++){if(a[i]){nA++;if(b[i])dot++}}if(nA===0||nB===0)return 0;return dot/Math.sqrt(nA*nB)}
+function trainModel(){buildVocab();const sums={},counts={};for(const r of trainData){const v=vecFromTitle(r.title);const lab=r.label;if(!sums[lab]){sums[lab]=new Float32Array(vocab.length);counts[lab]=0}for(let i=0;i<v.length;i++){sums[lab][i]+=v[i]}counts[lab]++}for(const lab in sums){for(let i=0;i<vocab.length;i++){sums[lab][i]/=counts[lab]}centroids[lab]=sums[lab];let n=0;for(let i=0;i<vocab.length;i++){if(centroids[lab][i]>0)n++}centroidNorm[lab]=Math.sqrt(n)}}
+function predict(t){const v=vecFromTitle(t);let best=null,bestScore=-1;for(const lab in centroids){const s=cosine(v,centroids[lab],centroidNorm[lab]);if(s>bestScore){bestScore=s;best=lab}}return best}
+
+let modelCorrect=0,userCorrect=0,currentTest=0;
+trainModel();
+function showTest(){
+  if(currentTest>=testData.length){
+    document.getElementById('current-title').textContent='Fin des tests';
+    document.getElementById('model-pred').textContent='Terminé';
+    document.querySelector('.choices').innerHTML='';
+    return;
+  }
+  const t=testData[currentTest];
+  document.getElementById('current-title').textContent=`Visionné : ${t.title}`;
+  const cat=predict(t.title);
+  const suggestion=recVid[cat]||'Aucune';
+  document.getElementById('model-pred').innerHTML=`Suggestion : <strong>${suggestion}</strong>`;
+  if(cat===t.label){modelCorrect++;document.getElementById('model-correct').textContent=modelCorrect;}
+}
+function vote(cat){
+  if(currentTest>=testData.length)return;
+  const t=testData[currentTest];
+  if(cat===t.label){userCorrect++;document.getElementById('user-correct').textContent=userCorrect;}
+  currentTest++;
+  showTest();
+}
+showTest();
