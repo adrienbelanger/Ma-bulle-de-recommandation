@@ -114,7 +114,7 @@
 <body>
   <div class="nav-bubble nav-left" onclick="navigate('page4.html')">◀</div>
   <div class="nav-bubble nav-right" onclick="navigate('page6.html')">▶</div>
-  <h1>Quelle sera la prochaine vidéo ?</h1>
+  <h1 id="current-title"></h1>
   <div class="content">
     <div class="panel">
       <h2>Modèle Entraîné</h2>
@@ -124,7 +124,7 @@
     <div class="panel">
       <h2>Arbre de Décision</h2>
       <div id="cy"></div>
-      <div id="current-title"></div>
+      
       <div class="choices">
         <button onclick="vote('Dessins')">Dessins</button>
         <button onclick="vote('Expériences')">Expériences</button>
@@ -136,7 +136,7 @@
     </div>
   </div>
   <div class="bubble-floating" style="left:10%;width:80px;height:80px;animation-delay:1s"></div>
-  <div class="bubble-floating" style="left:30%;width:60px;height:60px;animation-delay:5s"></div>
+  <div class="bubble-floating" style="left:30%;width:60px;height:60px;animation: delay 5sre;"></div>
   <div class="bubble-floating" style="left:50%;width:100px;height:100px;animation-delay:3s"></div>
   <div class="bubble-floating" style="left:70%;width:50px;height:50px;animation-delay:7s"></div>
   <div class="bubble-floating" style="left:90%;width:80px;height:80px;animation-delay:4s"></div>
