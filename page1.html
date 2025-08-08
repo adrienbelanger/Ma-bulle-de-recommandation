@@ -108,14 +108,22 @@
 
   <div class="container">
     <div class="quiz-panel">
-      <h2>Donnée et Prédiction</h2>
+      <h2>Donnée et prédiction</h2>
       <div class="question" id="question-text"></div>
       <div class="options" id="options"></div>
     </div>
     <div class="data-panel">
       <h2>Dataset</h2>
       <table>
-        <thead><tr><th>Âge</th><th>Vidéo vue</th><th>Catégorie</th><th>Prédiction</th></tr></thead>
+        <thead>
+          <tr>
+            <th>Vues</th>
+            <th>Ratio d'appréciation</th>
+            <th>Commentaires</th>
+            <th>Publiée il y a (jours)</th>
+            <th>Prédiction</th>
+          </tr>
+        </thead>
         <tbody id="dataset-body"></tbody>
       </table>
     </div>
@@ -135,16 +143,16 @@
       document.body.addEventListener('animationend', () => window.location.href = dest, { once: true });
     }
     const questions = [
-      { age: 11, watched: 'Découverte d’un monde de blocs', category: 'Jeux', options: ['Top des nouveautés ludiques','Recette facile de gâteaux','Daily vlog scolaire','Astuces de soins pour animaux'] },
-      { age: 13, watched: 'Tutoriel sur la préparation de smoothies', category: 'Cuisine', options: ['Compilation de jeux rétro','Top des looks street','Recette de smoothie','Épisode de vlog voyage'] },
-      { age: 12, watched: 'Vlog : ma journée sportive', category: 'Sport', options: ['Tips gaming','Comment customiser un t-shirt','Ma séance de sport','Visite d’un refuge animalier'] },
-      { age: 14, watched: 'Présentation des tendances mode été', category: 'Mode', options: ['Revue de jeu d’aventure','Défi pâtisserie','Haul mode','Vlog aventure en forêt'] },
-      { age: 11, watched: 'Mon chat apprend un nouveau tour', category: 'Animaux', options: ['Top jeux collaboratifs','Vlog cuisine','Soins pour chat','Tutoriel danse'] },
-      { age: 13, watched: 'Recette de crêpes express', category: 'Cuisine', options: ['Gaming en direct','Top pièces vintage','Recette de crêpes','Vlog découverte'] },
-      { age: 12, watched: 'Exploration d’un jeu d’énigmes', category: 'Jeux', options: ['DIY mode','Compilation fails drôles','Jeu d’énigmes','Recette rapide'] },
-      { age: 14, watched: 'Interview d’un créateur de mode', category: 'Mode', options: ['Challenge gaming','Interview créateur','Recette de cookies','Vlog sportif'] },
-      { age: 11, watched: 'Test d’un nouveau jeu de sport', category: 'Sport', options: ['Recette soupe','Critique du jeu','Vlog animalier','Conseils mode'] },
-      { age: 13, watched: 'Mes astuces pour une journée productive', category: 'Vlog', options: ['Revue JV stress','Astuce organisation','Recette snack','Haul sneakers'] }
+      { views: 25000, likeRatio: 0.9, commentCount: 800, publishedDaysAgo: 1 },
+      { views: 500, likeRatio: 0.95, commentCount: 5, publishedDaysAgo: 0 },
+      { views: 100000, likeRatio: 0.4, commentCount: 6000, publishedDaysAgo: 10 },
+      { views: 7500, likeRatio: 0.8, commentCount: 150, publishedDaysAgo: 2 },
+      { views: 3000, likeRatio: 0.6, commentCount: 450, publishedDaysAgo: 30 },
+      { views: 50000, likeRatio: 0.95, commentCount: 2000, publishedDaysAgo: 5 },
+      { views: 1200, likeRatio: 0.7, commentCount: 90, publishedDaysAgo: 1 },
+      { views: 80000, likeRatio: 0.88, commentCount: 500, publishedDaysAgo: 20 },
+      { views: 45000, likeRatio: 0.2, commentCount: 8000, publishedDaysAgo: 3 },
+      { views: 600, likeRatio: 0.5, commentCount: 10, publishedDaysAgo: 60 }
     ];
     let current = 0;
     const questionText = document.getElementById('question-text');
@@ -153,10 +161,10 @@
     function renderQuestion() {
       const q = questions[current];
       questionText.classList.remove('fade'); void questionText.offsetWidth;
-      questionText.textContent = `Vous avez ${q.age} ans et venez de regarder « ${q.watched} ».`;
+      questionText.textContent = `Cette vidéo a ${q.views} vues, un ratio d'appréciation de ${q.likeRatio}, ${q.commentCount} commentaires et a été publiée il y a ${q.publishedDaysAgo} jours. L'algorithme la mettra-t-il de l'avant?`;
       questionText.classList.add('fade');
       optionsDiv.innerHTML = '';
-      q.options.forEach(opt => {
+      ['Oui','Non'].forEach(opt => {
         const btn = document.createElement('button'); btn.textContent = opt;
         btn.onclick = () => addPrediction(opt);
         optionsDiv.appendChild(btn);
@@ -165,7 +173,7 @@
     function addPrediction(choice) {
       const q = questions[current];
       const row = document.createElement('tr');
-      row.innerHTML = `<td>${q.age}</td><td>${q.watched}</td><td>${q.category}</td><td>${choice}</td>`;
+      row.innerHTML = `<td>${q.views}</td><td>${q.likeRatio}</td><td>${q.commentCount}</td><td>${q.publishedDaysAgo}</td><td>${choice}</td>`;
       row.classList.add('row-fade-in'); tbody.appendChild(row);
       current++;
       if (current < questions.length) setTimeout(renderQuestion,300);
