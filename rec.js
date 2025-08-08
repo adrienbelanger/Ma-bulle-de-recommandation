@@ -1,3 +1,4 @@
+
 const rec = (() => {
   const state = {
     data: null,
@@ -26,10 +27,12 @@ const rec = (() => {
     const v = new Uint8Array(state.vocab.length);
     for (const w of tokens(t)) {
       const i = state.word2idx[w];
+
       if (i !== undefined) v[i] = 1;
     }
     return v;
   }
+
 
   function cosine(a, b, nB) {
     let dot = 0, nA = 0;
@@ -42,6 +45,7 @@ const rec = (() => {
     if (nA === 0 || nB === 0) return 0;
     return dot / Math.sqrt(nA * nB);
   }
+
 
   function trainModel(train) {
     buildVocab(train);
@@ -93,4 +97,5 @@ const rec = (() => {
 
   return { loadData, rank };
 })();
+
 

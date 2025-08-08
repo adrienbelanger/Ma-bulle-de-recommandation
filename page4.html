@@ -37,17 +37,30 @@ th{background:rgba(255,255,255,.2)}
 <div class="container">
   <div class="data-panel">
     <h2>Entraînement</h2>
+    <div>
+      <label>λ Popularité: <span id="lambdaVal"></span></label>
+      <input id="lambdaSlider" type="range" min="0" max="1" step="0.01">
+    </div>
+    <div>
+      <label>k : <span id="kVal"></span></label>
+      <input id="kSlider" type="range" min="1" max="5" step="1">
+    </div>
     <button id="trainBtn">Appuyer ici pour entraîner le modèle</button>
     <div id="status">Prêt</div>
     <div id="results"></div>
   </div>
+
 </div>
-<script>
+<script type="module">
+
+import * as rec from './rec.js';
+
 function navigate(u){
  document.body.classList.add('fade-out');
  const dest=u+location.hash;
- document.body.addEventListener('animationend',()=>location.href=dest,{once:true})
+ document.body.addEventListener('animationend',()=>location.href=dest,{once:true});
 }
+
 
 document.getElementById('trainBtn').addEventListener('click', async () => {
  document.getElementById('trainBtn').disabled = true;
@@ -66,6 +79,8 @@ document.getElementById('trainBtn').addEventListener('click', async () => {
  document.getElementById('status').textContent = 'Terminé';
  document.getElementById('trainBtn').disabled = false;
 });
+
 </script>
+
 </body>
 </html>

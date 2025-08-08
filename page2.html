@@ -49,7 +49,7 @@
       animation: floatUp 30s linear infinite;
       pointer-events: none; backdrop-filter: blur(8px);
       z-index: 0; }
-    @keyframes floatUp { 0% { bottom: -100px; transform: translateX(0);} 
+    @keyframes floatUp { 0% { bottom: -100px; transform: translateX(0);}
       100% { bottom: 110%; transform: translateX(50px);} }
   </style>
 </head>
@@ -61,39 +61,8 @@
   <div class="container">
     <div class="panel">
       <h2>Données (supprimez les lignes absurdes)</h2>
-      <table>
-        <thead>
-          <tr>
-            <th>Âge</th>
-            <th>Vidéo vue</th>
-            <th>Catégorie</th>
-            <th>Vidéo suivante</th>
-            <th>Action</th>
-          </tr>
-        </thead>
-        <tbody id="data-body">
-          <tr><td>12</td><td>Découverte d’un monde de blocs</td><td>Jeux</td><td>Top des nouveautés ludiques</td><td><button class="clean-btn" onclick="removeRow(this)">✖</button></td></tr>
-          <tr><td>300</td><td>Comment survivre à l’apocalypse zombie en 5 minutes</td><td>Survie</td><td>Survie extrême</td><td><button class="clean-btn" onclick="removeRow(this)">✖</button></td></tr>
-          <tr><td>-5</td><td>Recette de cookies quantiques</td><td>Cuisine</td><td>Pâtisserie futuriste</td><td><button class="clean-btn" onclick="removeRow(this)">✖</button></td></tr>
-          <tr><td>14</td><td>Présentation des tendances mode été</td><td>Mode</td><td>Haul mode</td><td><button class="clean-btn" onclick="removeRow(this)">✖</button></td></tr>
-          <tr><td>8</td><td>Mon chat apprend un nouveau tour</td><td>Animaux</td><td>Tutoriel animaux</td><td><button class="clean-btn" onclick="removeRow(this)">✖</button></td></tr>
-          <tr><td>42</td><td>Théories de complot sur les fourchettes</td><td>Mystère</td><td>Documentaire mystère</td><td><button class="clean-btn" onclick="removeRow(this)">✖</button></td></tr>
-          <tr><td>0</td><td>Secrets de l’univers parallèle</td><td>Science</td><td>Exploration spatiale</td><td><button class="clean-btn" onclick="removeRow(this)">✖</button></td></tr>
-          <tr><td>150</td><td>Voyage dans le temps expliqué</td><td>Science</td><td>Chrono-science</td><td><button class="clean-btn" onclick="removeRow(this)">✖</button></td></tr>
-          <tr><td>13</td><td>Tutoriel construction de cabane</td><td>DIY</td><td>DIY nature</td><td><button class="clean-btn" onclick="removeRow(this)">✖</button></td></tr>
-          <tr><td>11</td><td>Compilation des meilleurs fails</td><td>Humour</td><td>Divertissement</td><td><button class="clean-btn" onclick="removeRow(this)">✖</button></td></tr>
-          <tr><td>9</td><td>Recette de pizza aux insectes</td><td>Cuisine</td><td>Cuisine alternative</td><td><button class="clean-btn" onclick="removeRow(this)">✖</button></td></tr>
-          <tr><td>85</td><td>Analyse des rêves</td><td>Psychologie</td><td>Psychologie</td><td><button class="clean-btn" onclick="removeRow(this)">✖</button></td></tr>
-          <tr><td>16</td><td>Guide complet de magie noire</td><td>Paranormal</td><td>Paranormal</td><td><button class="clean-btn" onclick="removeRow(this)">✖</button></td></tr>
-          <tr><td>-1</td><td>Vidéo absurde sans sens</td><td>Bizarre</td><td>Thriller psychologique</td><td><button class="clean-btn" onclick="removeRow(this)">✖</button></td></tr>
-          <tr><td>20</td><td>DIY customisation de skateboard</td><td>DIY</td><td>Sport urbain</td><td><button class="clean-btn" onclick="removeRow(this)">✖</button></td></tr>
-          <tr><td>7</td><td>Vlog : journée à la bibliothèque</td><td>Vlog</td><td>Vie scolaire</td><td><button class="clean-btn" onclick="removeRow(this)">✖</button></td></tr>
-          <tr><td>130</td><td>Comment plier l’espace-temps</td><td>Science</td><td>Science-fiction</td><td><button class="clean-btn" onclick="removeRow(this)">✖</button></td></tr>
-          <tr><td>13</td><td>Top 10 des animaux mignons</td><td>Animaux</td><td>Animaux</td><td><button class="clean-btn" onclick="removeRow(this)">✖</button></td></tr>
-          <tr><td>15</td><td>Tutoriel dessin manga</td><td>Art</td><td>Art graphique</td><td><button class="clean-btn" onclick="removeRow(this)">✖</button></td></tr>
-          <tr><td>28</td><td>Présentation d’un nouveau langage</td><td>Informatique</td><td>Informatique</td><td><button class="clean-btn" onclick="removeRow(this)">✖</button></td></tr>
-        </tbody>
-      </table>
+      <div id="data-body"></div>
+      <button id="save-btn" class="clean-btn" style="margin-top:1rem;">Save</button>
     </div>
   </div>
 
@@ -104,17 +73,79 @@
   <div class="bubble-floating" style="left:70%;width:50px;height:50px;animation-delay:7s;"></div>
   <div class="bubble-floating" style="left:90%;width:80px;height:80px;animation-delay:4s;"></div>
 
-  <script>
+
+  <script type="module">
+    import * as rec from "./recommender.js";
+    await rec.loadData();
+
     function navigate(url) {
       document.body.classList.add('fade-out');
       const dest = url + location.hash;
       document.body.addEventListener('animationend', () => window.location.href = dest, { once: true });
     }
-    function removeRow(btn) {
-      const row = btn.closest('tr');
-      row.classList.add('fade-out-row');
-      row.addEventListener('animationend', () => row.remove());
+    const numericFields = ['views','likes','dislikes','comments','publishedDaysAgo','lenSec'];
+    let videos = [];
+    let sortField = null;
+    let sortAsc = true;
+
+    function renderTable() {
+      const container = document.getElementById('data-body');
+      container.innerHTML = '';
+      const table = document.createElement('table');
+      table.id = 'video-grid';
+      const thead = document.createElement('thead');
+      const headRow = document.createElement('tr');
+      numericFields.forEach(field => {
+        const th = document.createElement('th');
+        th.textContent = field;
+        th.style.cursor = 'pointer';
+        th.onclick = () => {
+          if (sortField === field) sortAsc = !sortAsc; else { sortField = field; sortAsc = true; }
+          renderTable();
+        };
+        headRow.appendChild(th);
+      });
+      const thAction = document.createElement('th');
+      thAction.textContent = 'Action';
+      headRow.appendChild(thAction);
+      thead.appendChild(headRow);
+      table.appendChild(thead);
+
+      const tbody = document.createElement('tbody');
+      const data = [...videos];
+      if (sortField) {
+        data.sort((a,b) => sortAsc ? a[sortField]-b[sortField] : b[sortField]-a[sortField]);
+      }
+      data.forEach(v => {
+        const tr = document.createElement('tr');
+        numericFields.forEach(f => {
+          const td = document.createElement('td');
+          td.textContent = v[f];
+          tr.appendChild(td);
+        });
+        const tdDel = document.createElement('td');
+        const btn = document.createElement('button');
+        btn.className = 'clean-btn';
+        btn.textContent = '✖';
+        btn.onclick = () => {
+          videos.splice(videos.indexOf(v),1);
+          renderTable();
+        };
+        tdDel.appendChild(btn);
+        tr.appendChild(tdDel);
+        tbody.appendChild(tr);
+      });
+      table.appendChild(tbody);
+      container.appendChild(table);
     }
+
+    document.getElementById('save-btn').onclick = () => {
+      localStorage.videosClean = JSON.stringify(videos);
+      navigate('page3.html');
+    };
+
+    Promise.resolve(rec.loadData()).then(d => { videos = d; renderTable(); });
   </script>
+
 </body>
 </html>

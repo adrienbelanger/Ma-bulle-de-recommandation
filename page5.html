@@ -138,6 +138,7 @@
   <div class="bubble-floating" style="left:70%;width:50px;height:50px;animation-delay:7s"></div>
   <div class="bubble-floating" style="left:90%;width:80px;height:80px;animation-delay:4s"></div>
 
+
 <script>
 function navigate(url){
   document.body.classList.add('fade-out');
@@ -163,10 +164,12 @@ const cy = cytoscape({
         'text-background-color': '#fff', 'text-background-shape': 'roundrectangle',
         'text-background-padding': 2, 'font-size': 12, 'text-rotation': 'autorotate'
       }
+
     }
   ],
   layout: { name: 'breadthfirst' }
 });
+
 
 function loadTree(){
   let raw = localStorage.getItem('decisionTree');
@@ -274,5 +277,6 @@ function finish(){
   document.getElementById('tree-metrics').textContent=`F1: ${f1Tree.toFixed(2)} | Diversité: ${divTree} | Likes moyens: ${likeTree.toFixed(1)}%`;
 }
 </script>
+
 </body>
 </html>
