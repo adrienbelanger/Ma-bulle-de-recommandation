@@ -74,77 +74,54 @@
   <div class="bubble-floating" style="left:90%;width:80px;height:80px;animation-delay:4s;"></div>
 
 
-  <script type="module">
-    import * as rec from "./recommender.js";
-    await rec.loadData();
+  <script>
+    function saveCleanData() {
+      const rows = Array.from(document.querySelectorAll('#data-body tr'));
+      const data = rows.map(r => {
+        const cells = r.querySelectorAll('td');
+        return {
+          age: cells[0].textContent,
+          video: cells[1].textContent,
+          category: cells[2].textContent,
+          next: cells[3].textContent
+        };
+      });
+      localStorage.setItem('videosClean', JSON.stringify(data));
+    }
+
 
     function navigate(url) {
+      saveCleanData();
       document.body.classList.add('fade-out');
       const dest = url + location.hash;
       document.body.addEventListener('animationend', () => window.location.href = dest, { once: true });
     }
-    const numericFields = ['views','likes','dislikes','comments','publishedDaysAgo','lenSec'];
-    let videos = [];
-    let sortField = null;
-    let sortAsc = true;
 
-    function renderTable() {
-      const container = document.getElementById('data-body');
-      container.innerHTML = '';
-      const table = document.createElement('table');
-      table.id = 'video-grid';
-      const thead = document.createElement('thead');
-      const headRow = document.createElement('tr');
-      numericFields.forEach(field => {
-        const th = document.createElement('th');
-        th.textContent = field;
-        th.style.cursor = 'pointer';
-        th.onclick = () => {
-          if (sortField === field) sortAsc = !sortAsc; else { sortField = field; sortAsc = true; }
-          renderTable();
-        };
-        headRow.appendChild(th);
-      });
-      const thAction = document.createElement('th');
-      thAction.textContent = 'Action';
-      headRow.appendChild(thAction);
-      thead.appendChild(headRow);
-      table.appendChild(thead);
 
-      const tbody = document.createElement('tbody');
-      const data = [...videos];
-      if (sortField) {
-        data.sort((a,b) => sortAsc ? a[sortField]-b[sortField] : b[sortField]-a[sortField]);
-      }
-      data.forEach(v => {
-        const tr = document.createElement('tr');
-        numericFields.forEach(f => {
-          const td = document.createElement('td');
-          td.textContent = v[f];
-          tr.appendChild(td);
-        });
-        const tdDel = document.createElement('td');
-        const btn = document.createElement('button');
-        btn.className = 'clean-btn';
-        btn.textContent = '✖';
-        btn.onclick = () => {
-          videos.splice(videos.indexOf(v),1);
-          renderTable();
-        };
-        tdDel.appendChild(btn);
-        tr.appendChild(tdDel);
-        tbody.appendChild(tr);
-      });
-      table.appendChild(tbody);
-      container.appendChild(table);
+    function removeRow(btn) {
+      const row = btn.closest('tr');
+      row.classList.add('fade-out-row');
+      row.addEventListener('animationend', () => row.remove());
     }
 
-    document.getElementById('save-btn').onclick = () => {
-      localStorage.videosClean = JSON.stringify(videos);
-      navigate('page3.html');
-    };
+    function restoreCleanData() {
+      const saved = localStorage.getItem('videosClean');
+      if (!saved) return;
+      try {
+        const data = JSON.parse(saved);
+        const tbody = document.getElementById('data-body');
+        tbody.innerHTML = '';
+        data.forEach(r => {
+          const tr = document.createElement('tr');
+          tr.innerHTML = `<td>${r.age}</td><td>${r.video}</td><td>${r.category}</td><td>${r.next}</td>` +
+            '<td><button class="clean-btn" onclick="removeRow(this)">✖</button></td>';
+          tbody.appendChild(tr);
+        });
+      } catch (e) {}
+    }
 
-    Promise.resolve(rec.loadData()).then(d => { videos = d; renderTable(); });
+    restoreCleanData();
+
   </script>
 
 </body>

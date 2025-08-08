@@ -257,23 +257,32 @@
         if (e.classes && e.classes.length) out.classes = e.classes;
         return out;
       });
-      const comp = LZString.compressToEncodedURIComponent(JSON.stringify(snap));
+      const json = JSON.stringify(snap);
+      localStorage.setItem('decisionTree', json);
+      const comp = LZString.compressToEncodedURIComponent(json);
       history.replaceState(null, '', '#' + comp);
       localStorage.setItem('decisionTree', comp);
     }
     function loadState() {
-      let h = location.hash.slice(1);
-      if(!h) h = localStorage.getItem('decisionTree') || '';
-      if (!h) return;
-      try {
-        const arr = JSON.parse(LZString.decompressFromEncodedURIComponent(h));
-        cy.elements().remove(); cy.add(arr);
-        const nIds = cy.nodes().map(n => +n.id().slice(1)).filter(x=>!isNaN(x));
-        const eIds = cy.edges().map(e => +e.id().slice(1)).filter(x=>!isNaN(x));
-        nextNodeId = nIds.length ? Math.max(...nIds)+1 : 0;
-        nextEdgeId = eIds.length ? Math.max(...eIds)+1 : 0;
-        refreshLeaves();
-      } catch(e) {}
+
+      let arr = null;
+      const h = location.hash.slice(1);
+      if (h) {
+        try { arr = JSON.parse(LZString.decompressFromEncodedURIComponent(h)); } catch(e) {}
+      }
+      if (!arr) {
+        const saved = localStorage.getItem('decisionTree');
+        if (saved) {
+          try { arr = JSON.parse(saved); } catch(e) {}
+        }
+      }
+      if (!arr) return;
+      cy.elements().remove(); cy.add(arr);
+      const nIds = cy.nodes().map(n => +n.id().slice(1)).filter(x=>!isNaN(x));
+      const eIds = cy.edges().map(e => +e.id().slice(1)).filter(x=>!isNaN(x));
+      nextNodeId = nIds.length ? Math.max(...nIds)+1 : 0;
+      nextEdgeId = eIds.length ? Math.max(...eIds)+1 : 0;
+
     }
     window.addEventListener('popstate', loadState);
     loadState();

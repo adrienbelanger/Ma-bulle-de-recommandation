@@ -121,13 +121,39 @@ const testData=[
 {title:'Premiers pas du koala',label:'Animaux'}
 ]
 let vocab=[],word2idx={},centroids={},centroidNorm={}
-let videoTitles={}
+
+let lambda=0,k=5;
+
 function buildVocab(){for(const r of trainData){for(const w of tokens(r.title)){if(word2idx[w]===undefined){word2idx[w]=vocab.length;vocab.push(w)}}}}
 function vecFromTitle(t){const v=new Uint8Array(vocab.length);for(const w of tokens(t)){const i=word2idx[w];if(i!==undefined)v[i]=1}return v}
 function cosine(a,b,nB){let dot=0,nA=0;for(let i=0;i<a.length;i++){if(a[i]){nA++;if(b[i])dot++}}if(nA===0||nB===0)return 0;return dot/Math.sqrt(nA*nB)}
 function trainModel(){buildVocab();const sums={},counts={};for(const r of trainData){const v=vecFromTitle(r.title);const lab=r.label;if(!sums[lab]){sums[lab]=new Float32Array(vocab.length);counts[lab]=0}for(let i=0;i<v.length;i++){sums[lab][i]+=v[i]}counts[lab]++}for(const lab in sums){for(let i=0;i<vocab.length;i++){sums[lab][i]/=counts[lab]}centroids[lab]=sums[lab];let n=0;for(let i=0;i<vocab.length;i++){if(centroids[lab][i]>0)n++}centroidNorm[lab]=Math.sqrt(n)}return counts}
 function predict(t){const v=vecFromTitle(t);let best=null,bestScore=-1;for(const lab in centroids){const s=cosine(v,centroids[lab],centroidNorm[lab]);if(s>bestScore){bestScore=s;best=lab}}return best}
-document.getElementById('trainBtn').addEventListener('click',async()=>{
+
+function saveModel(){
+  localStorage.setItem('trainedModel', JSON.stringify({vocab, centroids, centroidNorm}));
+  localStorage.setItem('settings', JSON.stringify({lambda, k}));
+}
+function loadModel(){
+  const m = localStorage.getItem('trainedModel');
+  if (!m) return false;
+  try {
+    const obj = JSON.parse(m);
+    vocab = obj.vocab || [];
+    word2idx = {};
+    vocab.forEach((w,i)=>word2idx[w]=i);
+    centroids = obj.centroids || {};
+    centroidNorm = obj.centroidNorm || {};
+    const st = localStorage.getItem('settings');
+    if (st) { const cfg = JSON.parse(st); lambda = cfg.lambda; k = cfg.k; }
+    document.getElementById('status').textContent = 'Modèle chargé';
+    return true;
+  } catch(e) {}
+  return false;
+}
+loadModel();
+document.getElementById('trainBtn').addEventListener('click',()=>{
+
  document.getElementById('trainBtn').disabled=true
  document.getElementById('status').textContent='Entraînement...'
  const data=await rec.loadData();
@@ -135,6 +161,7 @@ document.getElementById('trainBtn').addEventListener('click',async()=>{
  for(const v of vids){videoTitles[v.id]=v.title}
  setTimeout(()=>{
   trainModel()
+  saveModel()
   document.getElementById('status').textContent='Génération des recommandations...'
   let res='<h3>Suggestions après test</h3><table><tr><th>Titre visionné</th><th>Vidéo suggérée</th><th></th></tr>'
   for(const r of testData){const cat=predict(r.title);const ok=cat===r.label?'✅':'❌';const vid=rec.recommend(cat);res+=`<tr><td>${r.title}</td><td>${videoTitles[vid]||'Aucune'}</td><td>${ok}</td></tr>`}
