@@ -104,17 +104,6 @@
   <div class="bubble-floating" style="left:70%;width:50px;height:50px;animation-delay:7s;"></div>
   <div class="bubble-floating" style="left:90%;width:80px;height:80px;animation-delay:4s;"></div>
 
-  <script>
-    function navigate(url) {
-      document.body.classList.add('fade-out');
-      const dest = url + location.hash;
-      document.body.addEventListener('animationend', () => window.location.href = dest, { once: true });
-    }
-    function removeRow(btn) {
-      const row = btn.closest('tr');
-      row.classList.add('fade-out-row');
-      row.addEventListener('animationend', () => row.remove());
-    }
-  </script>
+    <script type="module" src="./src/main.js"></script>
 </body>
 </html>
