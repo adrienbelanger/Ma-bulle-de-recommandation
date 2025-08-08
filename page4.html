@@ -41,7 +41,10 @@ th{background:rgba(255,255,255,.2)}
     <div id="results"></div>
   </div>
 </div>
-<script>
+<script type="module">
+import * as rec from "./recommender.js";
+const videos = await rec.loadData();
+
 function navigate(u){
  document.body.classList.add('fade-out');
  const dest=u+location.hash;
@@ -113,9 +116,10 @@ function vecFromTitle(t){const v=new Uint8Array(vocab.length);for(const w of tok
 function cosine(a,b,nB){let dot=0,nA=0;for(let i=0;i<a.length;i++){if(a[i]){nA++;if(b[i])dot++}}if(nA===0||nB===0)return 0;return dot/Math.sqrt(nA*nB)}
 function trainModel(){buildVocab();const sums={},counts={};for(const r of trainData){const v=vecFromTitle(r.title);const lab=r.label;if(!sums[lab]){sums[lab]=new Float32Array(vocab.length);counts[lab]=0}for(let i=0;i<v.length;i++){sums[lab][i]+=v[i]}counts[lab]++}for(const lab in sums){for(let i=0;i<vocab.length;i++){sums[lab][i]/=counts[lab]}centroids[lab]=sums[lab];let n=0;for(let i=0;i<vocab.length;i++){if(centroids[lab][i]>0)n++}centroidNorm[lab]=Math.sqrt(n)}return counts}
 function predict(t){const v=vecFromTitle(t);let best=null,bestScore=-1;for(const lab in centroids){const s=cosine(v,centroids[lab],centroidNorm[lab]);if(s>bestScore){bestScore=s;best=lab}}return best}
-document.getElementById('trainBtn').addEventListener('click',()=>{
+document.getElementById('trainBtn').addEventListener('click',async()=>{
  document.getElementById('trainBtn').disabled=true
  document.getElementById('status').textContent='Entraînement...'
+ await rec.train(videos);
  setTimeout(()=>{
   trainModel()
   document.getElementById('status').textContent='Génération des recommandations...'
