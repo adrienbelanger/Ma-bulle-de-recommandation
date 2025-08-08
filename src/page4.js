@@ -1,66 +1,8 @@
-<!DOCTYPE html>
-<html lang="fr-CA">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Ma bulle de recommandation</title>
-<style>
-body{margin:0;padding:0;font-family:Verdana,sans-serif;background:linear-gradient(to bottom,#5bc0eb,#20639b);height:100vh;overflow:hidden;position:relative;opacity:0;animation:fadeIn .5s ease forwards}
-@keyframes fadeIn{from{opacity:0}to{opacity:1}}
-@keyframes fadeOut{from{opacity:1}to{opacity:0}}
-.fade-out{animation:fadeOut .5s ease forwards}
-.container{display:flex;justify-content:center;align-items:center;height:100%;padding:2rem;box-sizing:border-box;position:relative;z-index:1}
-.data-panel{background:rgba(255,255,255,.1);border-radius:8px;padding:1rem;color:#fff;overflow-y:auto;margin:auto;width:80%;max-width:500px;text-align:center}
-.nav-bubble{position:absolute;top:1rem;width:30px;height:30px;background:rgba(255,255,255,.2);border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;backdrop-filter:blur(6px);transition:background .2s;z-index:2;color:#fff;font-size:1rem}
-.nav-bubble:hover{background:rgba(255,255,255,.3)}
-.nav-left{right:70px}
-.nav-right{right:20px}
-#trainBtn{background:rgba(255,255,255,.2);border:none;border-radius:4px;padding:.6rem 1.2rem;cursor:pointer;backdrop-filter:blur(6px);color:#fff;font-size:1rem;transition:background .2s;outline:none;margin:1rem 0}
-#trainBtn:hover:not(:disabled){background:rgba(255,255,255,.3)}
-#trainBtn:disabled{opacity:.5;cursor:default}
-table{width:100%;border-collapse:collapse;margin:1rem 0}
-th,td{border:1px solid rgba(255,255,255,.3);padding:.5rem;text-align:center}
-th{background:rgba(255,255,255,.2)}
-.bubble-floating{position:absolute;border-radius:50%;background:rgba(255,255,255,.1);animation:floatUp 30s linear infinite;pointer-events:none;backdrop-filter:blur(8px);z-index:0}
-@keyframes floatUp{0%{bottom:-100px;transform:translateX(0)}100%{bottom:110%;transform:translateX(50px)}}
-</style>
-<script src="rec.js"></script>
-</head>
-<body>
-<div class="nav-bubble nav-left" onclick="navigate('page3.html')">◀</div>
-<div class="nav-bubble nav-right" onclick="navigate('page5.html')">▶</div>
-<div class="bubble-floating" style="left:10%;width:80px;height:80px;animation-delay:1s"></div>
-<div class="bubble-floating" style="left:30%;width:60px;height:60px;animation-delay:5s"></div>
-<div class="bubble-floating" style="left:50%;width:100px;height:100px;animation-delay:3s"></div>
-<div class="bubble-floating" style="left:70%;width:50px;height:50px;animation-delay:7s"></div>
-<div class="bubble-floating" style="left:90%;width:80px;height:80px;animation-delay:4s"></div>
-<div class="container">
-  <div class="data-panel">
-    <h2>Entraînement</h2>
-    <div>
-      <label>λ Popularité: <span id="lambdaVal"></span></label>
-      <input id="lambdaSlider" type="range" min="0" max="1" step="0.01">
-    </div>
-    <div>
-      <label>k : <span id="kVal"></span></label>
-      <input id="kSlider" type="range" min="1" max="5" step="1">
-    </div>
-    <button id="trainBtn">Appuyer ici pour entraîner le modèle</button>
-    <div id="status">Prêt</div>
-    <div id="results"></div>
-  </div>
-
-</div>
-<script type="module">
-
-import * as rec from './rec.js';
-
 function navigate(u){
  document.body.classList.add('fade-out');
  const dest=u+location.hash;
- document.body.addEventListener('animationend',()=>location.href=dest,{once:true});
+ document.body.addEventListener('animationend',()=>location.href=dest,{once:true})
 }
-
 function tokens(s){return s.toLowerCase().split(/[^a-zàâçéèêëîïôûùüÿñæœ]+/).filter(Boolean)}
 const trainData=[
 {title:'Moments drôles du castor bleu',label:'Dessins'},
@@ -120,59 +62,24 @@ const testData=[
 {title:'Pourquoi avons‑nous des saisons',label:'Sciences'},
 {title:'Premiers pas du koala',label:'Animaux'}
 ]
+const recVid={Dessins:'Aventure au chalet des amis',Expériences:'Réaction pâte à dents géante',Animaux:'Premiers pas du panda roux',Sciences:'Le système solaire expliqué','Jeux vidéo':'Construction d’un monde en blocs'}
 let vocab=[],word2idx={},centroids={},centroidNorm={}
-
-let lambda=0,k=5;
-
 function buildVocab(){for(const r of trainData){for(const w of tokens(r.title)){if(word2idx[w]===undefined){word2idx[w]=vocab.length;vocab.push(w)}}}}
 function vecFromTitle(t){const v=new Uint8Array(vocab.length);for(const w of tokens(t)){const i=word2idx[w];if(i!==undefined)v[i]=1}return v}
 function cosine(a,b,nB){let dot=0,nA=0;for(let i=0;i<a.length;i++){if(a[i]){nA++;if(b[i])dot++}}if(nA===0||nB===0)return 0;return dot/Math.sqrt(nA*nB)}
 function trainModel(){buildVocab();const sums={},counts={};for(const r of trainData){const v=vecFromTitle(r.title);const lab=r.label;if(!sums[lab]){sums[lab]=new Float32Array(vocab.length);counts[lab]=0}for(let i=0;i<v.length;i++){sums[lab][i]+=v[i]}counts[lab]++}for(const lab in sums){for(let i=0;i<vocab.length;i++){sums[lab][i]/=counts[lab]}centroids[lab]=sums[lab];let n=0;for(let i=0;i<vocab.length;i++){if(centroids[lab][i]>0)n++}centroidNorm[lab]=Math.sqrt(n)}return counts}
 function predict(t){const v=vecFromTitle(t);let best=null,bestScore=-1;for(const lab in centroids){const s=cosine(v,centroids[lab],centroidNorm[lab]);if(s>bestScore){bestScore=s;best=lab}}return best}
-
-function saveModel(){
-  localStorage.setItem('trainedModel', JSON.stringify({vocab, centroids, centroidNorm}));
-  localStorage.setItem('settings', JSON.stringify({lambda, k}));
-}
-function loadModel(){
-  const m = localStorage.getItem('trainedModel');
-  if (!m) return false;
-  try {
-    const obj = JSON.parse(m);
-    vocab = obj.vocab || [];
-    word2idx = {};
-    vocab.forEach((w,i)=>word2idx[w]=i);
-    centroids = obj.centroids || {};
-    centroidNorm = obj.centroidNorm || {};
-    const st = localStorage.getItem('settings');
-    if (st) { const cfg = JSON.parse(st); lambda = cfg.lambda; k = cfg.k; }
-    document.getElementById('status').textContent = 'Modèle chargé';
-    return true;
-  } catch(e) {}
-  return false;
-}
-loadModel();
 document.getElementById('trainBtn').addEventListener('click',()=>{
-
  document.getElementById('trainBtn').disabled=true
  document.getElementById('status').textContent='Entraînement...'
- const data=await rec.loadData();
- const vids=Array.isArray(data)?data:data.videos||[]
- for(const v of vids){videoTitles[v.id]=v.title}
  setTimeout(()=>{
   trainModel()
-  saveModel()
   document.getElementById('status').textContent='Génération des recommandations...'
   let res='<h3>Suggestions après test</h3><table><tr><th>Titre visionné</th><th>Vidéo suggérée</th><th></th></tr>'
-  for(const r of testData){const cat=predict(r.title);const ok=cat===r.label?'✅':'❌';const vid=rec.recommend(cat);res+=`<tr><td>${r.title}</td><td>${videoTitles[vid]||'Aucune'}</td><td>${ok}</td></tr>`}
+  for(const r of testData){const cat=predict(r.title);const ok=cat===r.label?'✅':'❌';res+=`<tr><td>${r.title}</td><td>${recVid[cat]||'Aucune'}</td><td>${ok}</td></tr>`}
   res+='</table>'
   document.getElementById('results').innerHTML=res
   document.getElementById('status').textContent='Terminé'
   document.getElementById('trainBtn').disabled=false
  },800)
 })
-
-</script>
-
-</body>
-</html>

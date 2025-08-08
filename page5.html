@@ -110,6 +110,7 @@
   </style>
   <script src="https://unpkg.com/cytoscape@3.32.1/dist/cytoscape.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/lz-string@1.4.4/libs/lz-string.min.js"></script>
+  <script src="rec.js"></script>
 </head>
 <body>
   <div class="nav-bubble nav-left" onclick="navigate('page4.html')">◀</div>
@@ -120,19 +121,15 @@
       <h2>Modèle Entraîné</h2>
       <div id="model-pred">Suggestion: <em>(aucune)</em></div>
       <div class="counter">✅: <span id="model-correct">0</span></div>
+      <div id="model-metrics"></div>
     </div>
     <div class="panel">
       <h2>Arbre de Décision</h2>
       <div id="cy"></div>
-      
-      <div class="choices">
-        <button onclick="vote('Dessins')">Dessins</button>
-        <button onclick="vote('Expériences')">Expériences</button>
-        <button onclick="vote('Animaux')">Animaux</button>
-        <button onclick="vote('Sciences')">Sciences</button>
-        <button onclick="vote('Jeux vidéo')">Jeux vidéo</button>
-      </div>
-      <div class="counter">✅: <span id="user-correct">0</span></div>
+
+      <div class="choices"></div>
+      <div class="counter">✅: <span id="tree-correct">0</span></div>
+      <div id="tree-metrics"></div>
     </div>
   </div>
   <div class="bubble-floating" style="left:10%;width:80px;height:80px;animation-delay:1s"></div>
@@ -141,12 +138,7 @@
   <div class="bubble-floating" style="left:70%;width:50px;height:50px;animation-delay:7s"></div>
   <div class="bubble-floating" style="left:90%;width:80px;height:80px;animation-delay:4s"></div>
 
-  <script>
-    function navigate(url) {
-      document.body.classList.add('fade-out');
-      const dest = url + location.hash;
-      document.body.addEventListener('animationend', () => window.location.href = dest, { once: true });
-    }
+
 
     // Load decision tree from URL
     const cy = cytoscape({
@@ -197,6 +189,7 @@
       }
     }
     loadTree();
+
 
     // --- Données d'entraînement et modèle ---
     function tokens(s){return s.toLowerCase().split(/[^a-zàâçéèêëîïôûùüÿñæœ]+/).filter(Boolean)}
@@ -253,14 +246,15 @@
       {title:'Simulation ferme canadienne',label:'Jeux vidéo'}
     ];
     const testData=[
-      {title:'Bataille de robots rétro',label:'Jeux vidéo'},
-      {title:'Expérience œuf rebondissant',label:'Expériences'},
-      {title:'Pourquoi avons‑nous des saisons',label:'Sciences'},
-      {title:'Premiers pas du koala',label:'Animaux'}
-    ];
-    const recVid={Dessins:'Aventure au chalet des amis',Expériences:'Réaction pâte à dents géante',Animaux:'Premiers pas du panda roux',Sciences:'Le système solaire expliqué','Jeux vidéo':'Construction d’un monde en blocs'};
+  {title:'Bataille de robots rétro',label:'Jeux vidéo'},
+  {title:'Expérience œuf rebondissant',label:'Expériences'},
+  {title:'Pourquoi avons‑nous des saisons',label:'Sciences'},
+  {title:'Premiers pas du koala',label:'Animaux'}
+  ];
     let vocab=[],word2idx={},centroids={},centroidNorm={};
+
     let lambda=0,k=5;
+
     function buildVocab(){for(const r of trainData){for(const w of tokens(r.title)){if(word2idx[w]===undefined){word2idx[w]=vocab.length;vocab.push(w)}}}}
     function vecFromTitle(t){const v=new Uint8Array(vocab.length);for(const w of tokens(t)){const i=word2idx[w];if(i!==undefined)v[i]=1}return v}
     function cosine(a,b,nB){let dot=0,nA=0;for(let i=0;i<a.length;i++){if(a[i]){nA++;if(b[i])dot++}}if(nA===0||nB===0)return 0;return dot/Math.sqrt(nA*nB)}
@@ -284,7 +278,9 @@
     function predict(t){const v=vecFromTitle(t);let best=null,bestScore=-1;for(const lab in centroids){const s=cosine(v,centroids[lab],centroidNorm[lab]);if(s>bestScore){bestScore=s;best=lab}}return best}
 
     let modelCorrect=0,userCorrect=0,currentTest=0;
+
     if(!loadModel()) trainModel();
+
     function showTest(){
       if(currentTest>=testData.length){
         document.getElementById('current-title').textContent='Fin des tests';
@@ -295,18 +291,43 @@
       const t=testData[currentTest];
       document.getElementById('current-title').textContent=`Visionné : ${t.title}`;
       const cat=predict(t.title);
-      const suggestion=recVid[cat]||'Aucune';
+      const vid=rec.recommend(cat);
+      const suggestion=videoTitles[vid]||'Aucune';
       document.getElementById('model-pred').innerHTML=`Suggestion : <strong>${suggestion}</strong>`;
       if(cat===t.label){modelCorrect++;document.getElementById('model-correct').textContent=modelCorrect;}
+
     }
-    function vote(cat){
-      if(currentTest>=testData.length)return;
-      const t=testData[currentTest];
-      if(cat===t.label){userCorrect++;document.getElementById('user-correct').textContent=userCorrect;}
-      currentTest++;
-      showTest();
+  ],
+  layout: { name: 'breadthfirst' }
+});
+
+
+function loadTree(){
+  let raw = localStorage.getItem('decisionTree');
+  if(!raw){
+    const hash = location.hash.slice(1);
+    if(hash) raw = hash;
+  }
+  if(!raw) return;
+  try{
+    const elements = JSON.parse(LZString.decompressFromEncodedURIComponent(raw));
+    cy.add(elements);
+  }catch(e){
+    console.error('Failed to load tree', e);
+  }
+}
+loadTree();
+
+function predictTree(video){
+  if(cy.nodes().length===0) return null;
+  let node = cy.nodes().filter(n=>n.indegree()===0)[0];
+  while(node){
+    if(node.hasClass('leaf')){
+      const vid = data.videos.find(v=>v.title===node.data('label'));
+      return vid?vid.id:null;
     }
-    showTest();
+
   </script>
+
 </body>
 </html>

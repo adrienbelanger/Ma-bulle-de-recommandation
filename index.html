@@ -93,7 +93,9 @@
   <div class="bubble-floating" style="width: 60px; height: 60px; left: 50%; animation-delay: 2s;">👍</div>
   <div class="bubble-floating" style="width: 40px; height: 40px; left: 70%; animation-delay: 7s;">❤️</div>
   <div class="bubble-floating" style="width: 60px; height: 60px; left: 85%; animation-delay: 3s;">👍</div>
-  <script>
+  <script type="module">
+    import * as rec from "./recommender.js";
+    await rec.loadData();
     document.getElementById('start-btn').addEventListener('click', () => {
       document.body.classList.add('fade-out');
       document.body.addEventListener('animationend', () => {
