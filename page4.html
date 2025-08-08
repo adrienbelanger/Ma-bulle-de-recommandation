@@ -48,14 +48,18 @@ th{background:rgba(255,255,255,.2)}
     <div id="status">Prêt</div>
     <div id="results"></div>
   </div>
+
 </div>
 <script type="module">
+
 import * as rec from './rec.js';
+
 function navigate(u){
  document.body.classList.add('fade-out');
  const dest=u+location.hash;
  document.body.addEventListener('animationend',()=>location.href=dest,{once:true});
 }
+
 const lambdaSlider=document.getElementById('lambdaSlider');
 const kSlider=document.getElementById('kSlider');
 const lambdaVal=document.getElementById('lambdaVal');
@@ -95,6 +99,8 @@ document.getElementById('trainBtn').addEventListener('click',()=>{
   document.getElementById('trainBtn').disabled=false;
  },100);
 });
+
 </script>
+
 </body>
 </html>

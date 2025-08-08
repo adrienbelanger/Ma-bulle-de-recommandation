@@ -141,15 +141,16 @@
   <div class="bubble-floating" style="left:70%;width:50px;height:50px;animation-delay:7s"></div>
   <div class="bubble-floating" style="left:90%;width:80px;height:80px;animation-delay:4s"></div>
 
+
   <script type="module">
     import * as rec from './rec.js';
+
     function navigate(url) {
       document.body.classList.add('fade-out');
       const dest = url + location.hash;
       document.body.addEventListener('animationend', () => window.location.href = dest, { once: true });
     }
-
-    // Load decision tree from URL
+      window.navigate = navigate;
     const cy = cytoscape({
       container: document.getElementById('cy'),
       elements: [],
@@ -189,15 +190,18 @@
     }
     loadTree();
 
+
     const testData=[
       {title:'Bataille de robots rétro',label:'Jeux vidéo'},
       {title:'Expérience œuf rebondissant',label:'Expériences'},
       {title:'Pourquoi avons‑nous des saisons',label:'Sciences'},
       {title:'Premiers pas du koala',label:'Animaux'}
     ];
+
     const recVid={Dessins:'Aventure au chalet des amis',Expériences:'Réaction pâte à dents géante',Animaux:'Premiers pas du panda roux',Sciences:'Le système solaire expliqué','Jeux vidéo':'Construction d’un monde en blocs'};
     const model=JSON.parse(localStorage.getItem('trainedModel')||'{}');
     let modelCorrect=0,userCorrect=0,currentTest=0;
+
     function showTest(){
       if(currentTest>=testData.length){
         document.getElementById('current-title').textContent='Fin des tests';
@@ -207,11 +211,17 @@
       }
       const t=testData[currentTest];
       document.getElementById('current-title').textContent=`Visionné : ${t.title}`;
+
       const cat=rec.predict(model,t.title);
       const suggestion=recVid[cat]||'Aucune';
+
       document.getElementById('model-pred').innerHTML=`Suggestion : <strong>${suggestion}</strong>`;
-      if(cat===t.label){modelCorrect++;document.getElementById('model-correct').textContent=modelCorrect;}
+      if(vid && vid.category===t.label){modelCorrect++;document.getElementById('model-correct').textContent=modelCorrect;}
+      const choiceDiv=document.querySelector('.choices');
+      choiceDiv.innerHTML='';
+      choices.forEach(cat=>{const b=document.createElement('button');b.textContent=cat;b.onclick=()=>vote(cat);choiceDiv.appendChild(b);});
     }
+
     function vote(cat){
       if(currentTest>=testData.length)return;
       const t=testData[currentTest];
@@ -219,7 +229,14 @@
       currentTest++;
       showTest();
     }
-    showTest();
+      window.vote = vote;
+
+    loadData().then(data=>{
+      ({trainData,testData,recVid}=data);
+      trainModel();
+      showTest();
+    });
   </script>
+
 </body>
 </html>
