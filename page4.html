@@ -36,6 +36,14 @@ th{background:rgba(255,255,255,.2)}
 <div class="container">
   <div class="data-panel">
     <h2>Entraînement</h2>
+    <div>
+      <label>λ Popularité: <span id="lambdaVal"></span></label>
+      <input id="lambdaSlider" type="range" min="0" max="1" step="0.01">
+    </div>
+    <div>
+      <label>k : <span id="kVal"></span></label>
+      <input id="kSlider" type="range" min="1" max="5" step="1">
+    </div>
     <button id="trainBtn">Appuyer ici pour entraîner le modèle</button>
     <div id="status">Prêt</div>
     <div id="results"></div>
@@ -43,41 +51,54 @@ th{background:rgba(255,255,255,.2)}
 
 </div>
 <script type="module">
-import * as rec from "./recommender.js";
-const videos = await rec.loadData();
 
+import * as rec from './rec.js';
 
 function navigate(u){
  document.body.classList.add('fade-out');
  const dest=u+location.hash;
  document.body.addEventListener('animationend',()=>location.href=dest,{once:true});
 }
-window.navigate = navigate;
-function tokens(s){return s.toLowerCase().split(/[^a-zàâçéèêëîïôûùüÿñæœ]+/).filter(Boolean)}
 
-let trainData=[],testData=[],recVid={};
-let vocab=[],word2idx={},centroids={},centroidNorm={};
-function buildVocab(){for(const r of trainData){for(const w of tokens(r.title)){if(word2idx[w]===undefined){word2idx[w]=vocab.length;vocab.push(w)}}}}
-function vecFromTitle(t){const v=new Uint8Array(vocab.length);for(const w of tokens(t)){const i=word2idx[w];if(i!==undefined)v[i]=1}return v}
-function cosine(a,b,nB){let dot=0,nA=0;for(let i=0;i<a.length;i++){if(a[i]){nA++;if(b[i])dot++}}if(nA===0||nB===0)return 0;return dot/Math.sqrt(nA*nB)}
-function trainModel(){buildVocab();const sums={},counts={};for(const r of trainData){const v=vecFromTitle(r.title);const lab=r.label;if(!sums[lab]){sums[lab]=new Float32Array(vocab.length);counts[lab]=0}for(let i=0;i<v.length;i++){sums[lab][i]+=v[i]}counts[lab]++}for(const lab in sums){for(let i=0;i<vocab.length;i++){sums[lab][i]/=counts[lab]}centroids[lab]=sums[lab];let n=0;for(let i=0;i<vocab.length;i++){if(centroids[lab][i]>0)n++}centroidNorm[lab]=Math.sqrt(n)}return counts}
-function predict(t){const v=vecFromTitle(t);let best=null,bestScore=-1;for(const lab in centroids){const s=cosine(v,centroids[lab],centroidNorm[lab]);if(s>bestScore){bestScore=s;best=lab}}return best}
-
-document.getElementById('trainBtn').addEventListener('click',async()=>{
- document.getElementById('trainBtn').disabled=true
- document.getElementById('status').textContent='Entraînement...'
- await rec.train(videos);
+const lambdaSlider=document.getElementById('lambdaSlider');
+const kSlider=document.getElementById('kSlider');
+const lambdaVal=document.getElementById('lambdaVal');
+const kVal=document.getElementById('kVal');
+const savedSettings=JSON.parse(localStorage.getItem('settings')||'{}');
+lambdaSlider.value=savedSettings.lambdaPopularity??0.5;
+kSlider.value=savedSettings.k??3;
+function persistSettings(){
+ const s={lambdaPopularity:parseFloat(lambdaSlider.value),k:parseInt(kSlider.value)};
+ lambdaVal.textContent=s.lambdaPopularity.toFixed(2);
+ kVal.textContent=s.k;
+ localStorage.setItem('settings',JSON.stringify(s));
+}
+lambdaSlider.addEventListener('input',persistSettings);
+kSlider.addEventListener('input',persistSettings);
+persistSettings();
+document.getElementById('trainBtn').addEventListener('click',()=>{
+ const cleanData=JSON.parse(localStorage.getItem('videosClean')||'[]');
+ if(cleanData.length===0){
+  document.getElementById('status').textContent='Aucune donnée';
+  return;
+ }
+ document.getElementById('trainBtn').disabled=true;
+ document.getElementById('status').textContent='Entraînement...';
  setTimeout(()=>{
-  trainModel()
-  document.getElementById('status').textContent='Génération des recommandations...'
-  let res='<h3>Suggestions après test</h3><table><tr><th>Titre visionné</th><th>Vidéo suggérée</th><th></th></tr>'
-  for(const r of testData){const cat=predict(r.title);const ok=cat===r.label?'✅':'❌';res+=`<tr><td>${r.title}</td><td>${recVid[cat]||'Aucune'}</td><td>${ok}</td></tr>`}
-  res+='</table>'
-  document.getElementById('results').innerHTML=res
-  document.getElementById('status').textContent='Terminé'
-  document.getElementById('trainBtn').disabled=false
- },800)
-})
+  const settings={lambdaPopularity:parseFloat(lambdaSlider.value),k:parseInt(kSlider.value)};
+  const {model,metrics}=rec.train(cleanData,settings);
+  localStorage.setItem('trainedModel',JSON.stringify(model));
+  localStorage.setItem('settings',JSON.stringify(settings));
+  let res='<h3>Résultats</h3><table><tr><th>Métrique</th><th>Valeur</th></tr>';
+  res+=`<tr><td>Précision</td><td>${metrics.precision.toFixed(2)}</td></tr>`;
+  res+=`<tr><td>Rappel</td><td>${metrics.recall.toFixed(2)}</td></tr>`;
+  res+=`<tr><td>Diversité</td><td>${metrics.diversity.toFixed(2)}</td></tr>`;
+  res+='</table>';
+  document.getElementById('results').innerHTML=res;
+  document.getElementById('status').textContent='Terminé';
+  document.getElementById('trainBtn').disabled=false;
+ },100);
+});
 
 </script>
 

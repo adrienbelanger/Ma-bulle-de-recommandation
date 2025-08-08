@@ -143,12 +143,7 @@
 
 
   <script type="module">
-    import * as rec from "./recommender.js";
-    const videos = await rec.loadData();
-    if(!localStorage.getItem('trainedModel')) {
-      rec.train(videos);
-    }
-
+    import * as rec from './rec.js';
 
     function navigate(url) {
       document.body.classList.add('fade-out');
@@ -202,9 +197,10 @@
       {title:'Pourquoi avons‑nous des saisons',label:'Sciences'},
       {title:'Premiers pas du koala',label:'Animaux'}
     ];
-    const choices=['Dessins','Expériences','Animaux','Sciences','Jeux vidéo'];
-    let modelCorrect=0,userCorrect=0,currentTest=0;
 
+    const recVid={Dessins:'Aventure au chalet des amis',Expériences:'Réaction pâte à dents géante',Animaux:'Premiers pas du panda roux',Sciences:'Le système solaire expliqué','Jeux vidéo':'Construction d’un monde en blocs'};
+    const model=JSON.parse(localStorage.getItem('trainedModel')||'{}');
+    let modelCorrect=0,userCorrect=0,currentTest=0;
 
     function showTest(){
       if(currentTest>=testData.length){
@@ -215,9 +211,10 @@
       }
       const t=testData[currentTest];
       document.getElementById('current-title').textContent=`Visionné : ${t.title}`;
-      const id = rec.rank(t.title, 0.5, 1)[0];
-      const vid = videos.find(v=>v.id===id);
-      const suggestion = vid ? vid.title : 'Aucune';
+
+      const cat=rec.predict(model,t.title);
+      const suggestion=recVid[cat]||'Aucune';
+
       document.getElementById('model-pred').innerHTML=`Suggestion : <strong>${suggestion}</strong>`;
       if(vid && vid.category===t.label){modelCorrect++;document.getElementById('model-correct').textContent=modelCorrect;}
       const choiceDiv=document.querySelector('.choices');
