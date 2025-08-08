@@ -40,7 +40,44 @@ th{background:rgba(255,255,255,.2)}
     <div id="status">Prêt</div>
     <div id="results"></div>
   </div>
-</div>
-  <script type="module" src="./src/main.js"></script>
+</div>s
+<script type="module">
+import { loadData } from './recommender.js';
+
+function navigate(u){
+ document.body.classList.add('fade-out');
+ const dest=u+location.hash;
+ document.body.addEventListener('animationend',()=>location.href=dest,{once:true});
+}
+window.navigate = navigate;
+function tokens(s){return s.toLowerCase().split(/[^a-zàâçéèêëîïôûùüÿñæœ]+/).filter(Boolean)}
+
+let trainData=[],testData=[],recVid={};
+let vocab=[],word2idx={},centroids={},centroidNorm={};
+function buildVocab(){for(const r of trainData){for(const w of tokens(r.title)){if(word2idx[w]===undefined){word2idx[w]=vocab.length;vocab.push(w)}}}}
+function vecFromTitle(t){const v=new Uint8Array(vocab.length);for(const w of tokens(t)){const i=word2idx[w];if(i!==undefined)v[i]=1}return v}
+function cosine(a,b,nB){let dot=0,nA=0;for(let i=0;i<a.length;i++){if(a[i]){nA++;if(b[i])dot++}}if(nA===0||nB===0)return 0;return dot/Math.sqrt(nA*nB)}
+function trainModel(){buildVocab();const sums={},counts={};for(const r of trainData){const v=vecFromTitle(r.title);const lab=r.label;if(!sums[lab]){sums[lab]=new Float32Array(vocab.length);counts[lab]=0}for(let i=0;i<v.length;i++){sums[lab][i]+=v[i]}counts[lab]++}for(const lab in sums){for(let i=0;i<vocab.length;i++){sums[lab][i]/=counts[lab]}centroids[lab]=sums[lab];let n=0;for(let i=0;i<vocab.length;i++){if(centroids[lab][i]>0)n++}centroidNorm[lab]=Math.sqrt(n)}return counts}
+function predict(t){const v=vecFromTitle(t);let best=null,bestScore=-1;for(const lab in centroids){const s=cosine(v,centroids[lab],centroidNorm[lab]);if(s>bestScore){bestScore=s;best=lab}}return best}
+
+loadData().then(data=>{
+  ({trainData,testData,recVid}=data);
+  document.getElementById('trainBtn').addEventListener('click',()=>{
+   document.getElementById('trainBtn').disabled=true;
+   document.getElementById('status').textContent='Entraînement...';
+   setTimeout(()=>{
+    trainModel();
+    document.getElementById('status').textContent='Génération des recommandations...';
+    let res='<h3>Suggestions après test</h3><table><tr><th>Titre visionné</th><th>Vidéo suggérée</th><th></th></tr>';
+    for(const r of testData){const cat=predict(r.title);const ok=cat===r.label?'✅':'❌';res+=`<tr><td>${r.title}</td><td>${recVid[cat]||'Aucune'}</td><td>${ok}</td></tr>`}
+    res+='</table>';
+    document.getElementById('results').innerHTML=res;
+    document.getElementById('status').textContent='Terminé';
+    document.getElementById('trainBtn').disabled=false;
+   },800);
+  });
+});
+</script>
+
 </body>
 </html>
