@@ -243,13 +243,13 @@
       {title:'Simulation ferme canadienne',label:'Jeux vidéo'}
     ];
     const testData=[
-      {title:'Bataille de robots rétro',label:'Jeux vidéo'},
-      {title:'Expérience œuf rebondissant',label:'Expériences'},
-      {title:'Pourquoi avons‑nous des saisons',label:'Sciences'},
-      {title:'Premiers pas du koala',label:'Animaux'}
-    ];
-    const recVid={Dessins:'Aventure au chalet des amis',Expériences:'Réaction pâte à dents géante',Animaux:'Premiers pas du panda roux',Sciences:'Le système solaire expliqué','Jeux vidéo':'Construction d’un monde en blocs'};
+  {title:'Bataille de robots rétro',label:'Jeux vidéo'},
+  {title:'Expérience œuf rebondissant',label:'Expériences'},
+  {title:'Pourquoi avons‑nous des saisons',label:'Sciences'},
+  {title:'Premiers pas du koala',label:'Animaux'}
+  ];
     let vocab=[],word2idx={},centroids={},centroidNorm={};
+    let videoTitles={};
     function buildVocab(){for(const r of trainData){for(const w of tokens(r.title)){if(word2idx[w]===undefined){word2idx[w]=vocab.length;vocab.push(w)}}}}
     function vecFromTitle(t){const v=new Uint8Array(vocab.length);for(const w of tokens(t)){const i=word2idx[w];if(i!==undefined)v[i]=1}return v}
     function cosine(a,b,nB){let dot=0,nA=0;for(let i=0;i<a.length;i++){if(a[i]){nA++;if(b[i])dot++}}if(nA===0||nB===0)return 0;return dot/Math.sqrt(nA*nB)}
@@ -258,6 +258,11 @@
 
     let modelCorrect=0,userCorrect=0,currentTest=0;
     trainModel();
+    rec.loadData().then(data=>{
+      const vids=Array.isArray(data)?data:data.videos||[];
+      for(const v of vids){videoTitles[v.id]=v.title}
+      showTest();
+    });
     function showTest(){
       if(currentTest>=testData.length){
         document.getElementById('current-title').textContent='Fin des tests';
@@ -268,7 +273,8 @@
       const t=testData[currentTest];
       document.getElementById('current-title').textContent=`Visionné : ${t.title}`;
       const cat=predict(t.title);
-      const suggestion=recVid[cat]||'Aucune';
+      const vid=rec.recommend(cat);
+      const suggestion=videoTitles[vid]||'Aucune';
       document.getElementById('model-pred').innerHTML=`Suggestion : <strong>${suggestion}</strong>`;
       if(cat===t.label){modelCorrect++;document.getElementById('model-correct').textContent=modelCorrect;}
     }
@@ -279,7 +285,6 @@
       currentTest++;
       showTest();
     }
-    showTest();
   </script>
 </body>
 </html>
