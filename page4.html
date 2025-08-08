@@ -4,25 +4,47 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Ma bulle de recommandation</title>
+<link rel="stylesheet" href="style/main.css">
 <style>
-body{margin:0;padding:0;font-family:Verdana,sans-serif;background:linear-gradient(to bottom,#5bc0eb,#20639b);height:100vh;overflow:hidden;position:relative;opacity:0;animation:fadeIn .5s ease forwards}
-@keyframes fadeIn{from{opacity:0}to{opacity:1}}
-@keyframes fadeOut{from{opacity:1}to{opacity:0}}
-.fade-out{animation:fadeOut .5s ease forwards}
-.container{display:flex;justify-content:center;align-items:center;height:100%;padding:2rem;box-sizing:border-box;position:relative;z-index:1}
-.data-panel{background:rgba(255,255,255,.1);border-radius:8px;padding:1rem;color:#fff;overflow-y:auto;margin:auto;width:80%;max-width:500px;text-align:center}
-.nav-bubble{position:absolute;top:1rem;width:30px;height:30px;background:rgba(255,255,255,.2);border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;backdrop-filter:blur(6px);transition:background .2s;z-index:2;color:#fff;font-size:1rem}
-.nav-bubble:hover{background:rgba(255,255,255,.3)}
-.nav-left{right:70px}
-.nav-right{right:20px}
-#trainBtn{background:rgba(255,255,255,.2);border:none;border-radius:4px;padding:.6rem 1.2rem;cursor:pointer;backdrop-filter:blur(6px);color:#fff;font-size:1rem;transition:background .2s;outline:none;margin:1rem 0}
-#trainBtn:hover:not(:disabled){background:rgba(255,255,255,.3)}
-#trainBtn:disabled{opacity:.5;cursor:default}
-table{width:100%;border-collapse:collapse;margin:1rem 0}
-th,td{border:1px solid rgba(255,255,255,.3);padding:.5rem;text-align:center}
-th{background:rgba(255,255,255,.2)}
-.bubble-floating{position:absolute;border-radius:50%;background:rgba(255,255,255,.1);animation:floatUp 30s linear infinite;pointer-events:none;backdrop-filter:blur(8px);z-index:0}
-@keyframes floatUp{0%{bottom:-100px;transform:translateX(0)}100%{bottom:110%;transform:translateX(50px)}}
+  .container {
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    height:100%;
+    padding:2rem;
+    box-sizing:border-box;
+    position:relative;
+    z-index:1;
+  }
+  .data-panel {
+    background:rgba(255,255,255,0.1);
+    border-radius:8px;
+    padding:1rem;
+    color:#fff;
+    overflow-y:auto;
+    margin:auto;
+    width:80%;
+    max-width:500px;
+    text-align:center;
+  }
+  #trainBtn {
+    background:rgba(255,255,255,0.2);
+    border:none;
+    border-radius:4px;
+    padding:.6rem 1.2rem;
+    cursor:pointer;
+    backdrop-filter:blur(6px);
+    color:#fff;
+    font-size:1rem;
+    transition:background .2s;
+    outline:none;
+    margin:1rem 0;
+  }
+  #trainBtn:hover:not(:disabled){background:rgba(255,255,255,0.3)}
+  #trainBtn:disabled{opacity:.5;cursor:default}
+  table{width:100%;border-collapse:collapse;margin:1rem 0}
+  th,td{border:1px solid rgba(255,255,255,0.3);padding:.5rem;text-align:center}
+  th{background:rgba(255,255,255,0.2)}
 </style>
 </head>
 <body>
