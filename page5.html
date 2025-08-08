@@ -1,20 +1,15 @@
 <!DOCTYPE html>
-<html lang="fr">
+<html lang="fr-CA">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Ma bulle de recommandation</title>
+  <link rel="stylesheet" href="style/main.css">
   <style>
     body {
-      margin: 0; padding: 0; font-family: Verdana, sans-serif;
-      background: linear-gradient(to bottom, #5bc0eb, #20639b);
-      height: 100vh; overflow: hidden; position: relative;
-      display: flex; flex-direction: column;
-      opacity: 0; animation: fadeIn 0.5s ease forwards;
+      display: flex;
+      flex-direction: column;
     }
-    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-    @keyframes fadeOut { from { opacity: 1; } to { opacity: 0; } }
-    .fade-out { animation: fadeOut 0.5s ease forwards; }
 
     h1 {
       color: white;
@@ -82,31 +77,6 @@
       font-weight: bold;
     }
 
-    .nav-bubble {
-      position: absolute; top: 1rem;
-      width: 30px; height: 30px;
-      background: rgba(255,255,255,0.2);
-      border-radius: 50%; display: flex;
-      align-items: center; justify-content: center;
-      cursor: pointer; backdrop-filter: blur(6px);
-      transition: background 0.2s;
-      z-index: 2; color: #fff; font-size: 1rem;
-    }
-    .nav-bubble:hover { background: rgba(255,255,255,0.3); }
-    .nav-left { right: 70px; }
-    .nav-right { right: 20px; }
-
-    .bubble-floating {
-      position: absolute; border-radius: 50%;
-      background: rgba(255,255,255,0.1);
-      animation: floatUp 30s linear infinite;
-      pointer-events: none; backdrop-filter: blur(8px);
-      z-index: 0;
-    }
-    @keyframes floatUp {
-      0% { bottom: -100px; transform: translateX(0); }
-      100% { bottom: 110%; transform: translateX(50px); }
-    }
   </style>
   <script src="https://unpkg.com/cytoscape@3.32.1/dist/cytoscape.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/lz-string@1.4.4/libs/lz-string.min.js"></script>
@@ -139,6 +109,12 @@
   <div class="bubble-floating" style="left:90%;width:80px;height:80px;animation-delay:4s"></div>
 
 
+  <script>
+    function navigate(url) {
+      document.body.classList.add('fade-out');
+      const dest = url + location.hash;
+      document.body.addEventListener('animationend', () => window.location.href = dest, { once: true });
+    }
 
     // Load decision tree from URL
     const cy = cytoscape({
@@ -171,22 +147,13 @@
       layout: { name: 'breadthfirst' }
     });
     function loadTree() {
-      let elements = null;
+
       const hash = location.hash.slice(1);
-      if (hash) {
-        try { elements = JSON.parse(LZString.decompressFromEncodedURIComponent(hash)); } catch (e) {}
-      }
-      if (!elements) {
-        const saved = localStorage.getItem('decisionTree');
-        if (saved) {
-          try { elements = JSON.parse(saved); } catch (e) {}
-        }
-      }
-      if (elements) {
+      if (!hash) return;
+      try {
+        const elements = JSON.parse(LZString.decompressFromEncodedURIComponent(hash));
         cy.add(elements);
-      } else {
-        console.error('Failed to load tree');
-      }
+      } catch (e) { console.error('Failed to load tree from hash:', e); }
     }
     loadTree();
 
@@ -208,7 +175,9 @@
       {title:'Fusée au bicarbonate de soude',label:'Expériences'},
       {title:'Réaction pâte à dents géante',label:'Expériences'},
       {title:'Fabriquer du slime étirable',label:'Expériences'},
-      {title:'Lait qui change de couleur',label:'Expriences'},
+
+      {title:'Lait qui change de couleur',label:'Expériences'},
+
       {title:'Oobleck étrange liquide‑solide',label:'Expériences'},
       {title:'Voiture ballon propulsée',label:'Expériences'},
       {title:'Lampe lave DIY',label:'Expériences'},
@@ -246,40 +215,24 @@
       {title:'Simulation ferme canadienne',label:'Jeux vidéo'}
     ];
     const testData=[
-  {title:'Bataille de robots rétro',label:'Jeux vidéo'},
-  {title:'Expérience œuf rebondissant',label:'Expériences'},
-  {title:'Pourquoi avons‑nous des saisons',label:'Sciences'},
-  {title:'Premiers pas du koala',label:'Animaux'}
-  ];
-    let vocab=[],word2idx={},centroids={},centroidNorm={};
 
-    let lambda=0,k=5;
+      {title:'Bataille de robots rétro',label:'Jeux vidéo'},
+      {title:'Expérience œuf rebondissant',label:'Expériences'},
+      {title:'Pourquoi avons‑nous des saisons',label:'Sciences'},
+      {title:'Premiers pas du koala',label:'Animaux'}
+    ];
+    const recVid={Dessins:'Aventure au chalet des amis',Expériences:'Réaction pâte à dents géante',Animaux:'Premiers pas du panda roux',Sciences:'Le système solaire expliqué','Jeux vidéo':'Construction d’un monde en blocs'};
+    let vocab=[],word2idx={},centroids={},centroidNorm={};
 
     function buildVocab(){for(const r of trainData){for(const w of tokens(r.title)){if(word2idx[w]===undefined){word2idx[w]=vocab.length;vocab.push(w)}}}}
     function vecFromTitle(t){const v=new Uint8Array(vocab.length);for(const w of tokens(t)){const i=word2idx[w];if(i!==undefined)v[i]=1}return v}
     function cosine(a,b,nB){let dot=0,nA=0;for(let i=0;i<a.length;i++){if(a[i]){nA++;if(b[i])dot++}}if(nA===0||nB===0)return 0;return dot/Math.sqrt(nA*nB)}
     function trainModel(){buildVocab();const sums={},counts={};for(const r of trainData){const v=vecFromTitle(r.title);const lab=r.label;if(!sums[lab]){sums[lab]=new Float32Array(vocab.length);counts[lab]=0}for(let i=0;i<v.length;i++){sums[lab][i]+=v[i]}counts[lab]++}for(const lab in sums){for(let i=0;i<vocab.length;i++){sums[lab][i]/=counts[lab]}centroids[lab]=sums[lab];let n=0;for(let i=0;i<vocab.length;i++){if(centroids[lab][i]>0)n++}centroidNorm[lab]=Math.sqrt(n)}}
-    function loadModel(){
-      const m = localStorage.getItem('trainedModel');
-      if (!m) return false;
-      try {
-        const obj = JSON.parse(m);
-        vocab = obj.vocab || [];
-        word2idx = {};
-        vocab.forEach((w,i)=>word2idx[w]=i);
-        centroids = obj.centroids || {};
-        centroidNorm = obj.centroidNorm || {};
-        const st = localStorage.getItem('settings');
-        if (st) { const cfg = JSON.parse(st); lambda = cfg.lambda; k = cfg.k; }
-        return true;
-      } catch(e) {}
-      return false;
-    }
+
     function predict(t){const v=vecFromTitle(t);let best=null,bestScore=-1;for(const lab in centroids){const s=cosine(v,centroids[lab],centroidNorm[lab]);if(s>bestScore){bestScore=s;best=lab}}return best}
 
     let modelCorrect=0,userCorrect=0,currentTest=0;
-
-    if(!loadModel()) trainModel();
+    trainModel();
 
     function showTest(){
       if(currentTest>=testData.length){
@@ -291,42 +244,19 @@
       const t=testData[currentTest];
       document.getElementById('current-title').textContent=`Visionné : ${t.title}`;
       const cat=predict(t.title);
-      const vid=rec.recommend(cat);
-      const suggestion=videoTitles[vid]||'Aucune';
+
+      const suggestion=recVid[cat]||'Aucune';
       document.getElementById('model-pred').innerHTML=`Suggestion : <strong>${suggestion}</strong>`;
       if(cat===t.label){modelCorrect++;document.getElementById('model-correct').textContent=modelCorrect;}
-
     }
-  ],
-  layout: { name: 'breadthfirst' }
-});
-
-
-function loadTree(){
-  let raw = localStorage.getItem('decisionTree');
-  if(!raw){
-    const hash = location.hash.slice(1);
-    if(hash) raw = hash;
-  }
-  if(!raw) return;
-  try{
-    const elements = JSON.parse(LZString.decompressFromEncodedURIComponent(raw));
-    cy.add(elements);
-  }catch(e){
-    console.error('Failed to load tree', e);
-  }
-}
-loadTree();
-
-function predictTree(video){
-  if(cy.nodes().length===0) return null;
-  let node = cy.nodes().filter(n=>n.indegree()===0)[0];
-  while(node){
-    if(node.hasClass('leaf')){
-      const vid = data.videos.find(v=>v.title===node.data('label'));
-      return vid?vid.id:null;
+    function vote(cat){
+      if(currentTest>=testData.length)return;
+      const t=testData[currentTest];
+      if(cat===t.label){userCorrect++;document.getElementById('user-correct').textContent=userCorrect;}
+      currentTest++;
+      showTest();
     }
-
+    showTest();
   </script>
 
 </body>
