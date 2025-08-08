@@ -143,7 +143,13 @@
 
 
   <script type="module">
-    import { loadData } from './recommender.js';
+    import * as rec from "./recommender.js";
+    const videos = await rec.loadData();
+    if(!localStorage.getItem('trainedModel')) {
+      rec.train(videos);
+    }
+
+
     function navigate(url) {
       document.body.classList.add('fade-out');
       const dest = url + location.hash;
@@ -189,16 +195,17 @@
     }
     loadTree();
 
-    function tokens(s){return s.toLowerCase().split(/[^a-zàâçéèêëîïôûùüÿñæœ]+/).filter(Boolean)}
-    let trainData=[],testData=[],recVid={};
-    let vocab=[],word2idx={},centroids={},centroidNorm={};
-    function buildVocab(){for(const r of trainData){for(const w of tokens(r.title)){if(word2idx[w]===undefined){word2idx[w]=vocab.length;vocab.push(w)}}}}
-    function vecFromTitle(t){const v=new Uint8Array(vocab.length);for(const w of tokens(t)){const i=word2idx[w];if(i!==undefined)v[i]=1}return v}
-    function cosine(a,b,nB){let dot=0,nA=0;for(let i=0;i<a.length;i++){if(a[i]){nA++;if(b[i])dot++}}if(nA===0||nB===0)return 0;return dot/Math.sqrt(nA*nB)}
-    function trainModel(){buildVocab();const sums={},counts={};for(const r of trainData){const v=vecFromTitle(r.title);const lab=r.label;if(!sums[lab]){sums[lab]=new Float32Array(vocab.length);counts[lab]=0}for(let i=0;i<v.length;i++){sums[lab][i]+=v[i]}counts[lab]++}for(const lab in sums){for(let i=0;i<vocab.length;i++){sums[lab][i]/=counts[lab]}centroids[lab]=sums[lab];let n=0;for(let i=0;i<vocab.length;i++){if(centroids[lab][i]>0)n++}centroidNorm[lab]=Math.sqrt(n)}}
-    function predict(t){const v=vecFromTitle(t);let best=null,bestScore=-1;for(const lab in centroids){const s=cosine(v,centroids[lab],centroidNorm[lab]);if(s>bestScore){bestScore=s;best=lab}}return best}
 
+    const testData=[
+      {title:'Bataille de robots rétro',label:'Jeux vidéo'},
+      {title:'Expérience œuf rebondissant',label:'Expériences'},
+      {title:'Pourquoi avons‑nous des saisons',label:'Sciences'},
+      {title:'Premiers pas du koala',label:'Animaux'}
+    ];
+    const choices=['Dessins','Expériences','Animaux','Sciences','Jeux vidéo'];
     let modelCorrect=0,userCorrect=0,currentTest=0;
+
+
     function showTest(){
       if(currentTest>=testData.length){
         document.getElementById('current-title').textContent='Fin des tests';
@@ -208,11 +215,16 @@
       }
       const t=testData[currentTest];
       document.getElementById('current-title').textContent=`Visionné : ${t.title}`;
-      const cat=predict(t.title);
-      const suggestion=recVid[cat]||'Aucune';
+      const id = rec.rank(t.title, 0.5, 1)[0];
+      const vid = videos.find(v=>v.id===id);
+      const suggestion = vid ? vid.title : 'Aucune';
       document.getElementById('model-pred').innerHTML=`Suggestion : <strong>${suggestion}</strong>`;
-      if(cat===t.label){modelCorrect++;document.getElementById('model-correct').textContent=modelCorrect;}
+      if(vid && vid.category===t.label){modelCorrect++;document.getElementById('model-correct').textContent=modelCorrect;}
+      const choiceDiv=document.querySelector('.choices');
+      choiceDiv.innerHTML='';
+      choices.forEach(cat=>{const b=document.createElement('button');b.textContent=cat;b.onclick=()=>vote(cat);choiceDiv.appendChild(b);});
     }
+
     function vote(cat){
       if(currentTest>=testData.length)return;
       const t=testData[currentTest];
