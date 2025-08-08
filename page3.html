@@ -1,11 +1,33 @@
 <!DOCTYPE html>
-<html lang="fr-CA">
+<html lang="fr">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Ma bulle de recommandation – Créateur d'Arbre</title>
-  <link rel="stylesheet" href="style/main.css">
   <style>
+    body {
+      margin: 0; padding: 0;
+      font-family: Verdana, sans-serif;
+      background: linear-gradient(to bottom, #5bc0eb, #20639b);
+      height: 100vh; overflow: hidden;
+      position: relative; animation: fadeIn 0.5s ease forwards;
+    }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+    @keyframes fadeOut{from{opacity:1}to{opacity:0}}
+    .fade-out{animation:fadeOut .5s ease forwards}
+    .nav-bubble { 
+      position: absolute; top: 1rem;
+      width: 30px; height: 30px; background: rgba(255,255,255,0.2);
+      border-radius: 50%; display: flex; align-items: center;
+      justify-content: center; cursor: pointer;
+      backdrop-filter: blur(6px); transition: background 0.2s;
+      z-index: 20; color: #fff; font-size: 1rem;
+    }
+    .nav-bubble:hover { background: rgba(255,255,255,0.3); }
+    .nav-left { right: 70px; }
+    .nav-right { right: 20px; }
+
     #container {
       position: absolute;
       top: 4rem; bottom: 2rem;
@@ -77,7 +99,17 @@
       background: #fff;
     }
 
-
+    .bubble-floating {
+      position: absolute; border-radius: 50%;
+      background: rgba(255,255,255,0.1);
+      animation: floatUp 30s linear infinite;
+      pointer-events: none; backdrop-filter: blur(8px);
+      z-index: -1;
+    }
+    @keyframes floatUp {
+      0% { bottom: -100px; transform: translateX(0); }
+      100% { bottom: 110%; transform: translateX(50px); }
+    }
   </style>
   <script src="https://unpkg.com/cytoscape@3.32.1/dist/cytoscape.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/lz-string@1.4.4/libs/lz-string.min.js"></script>
@@ -96,11 +128,6 @@
     </div>
     <div id="cy"></div>
     <input id="labelEditor" type="text" />
-    <div id="nodeModal">
-      <label>Champ: <select id="fieldSelect"></select></label>
-      <label>Seuil: <input id="thresholdInput" type="number"/></label>
-      <div><button id="modalOk">OK</button><button id="modalCancel">Annuler</button></div>
-    </div>
     <div id="trash" title="Glissez ici pour supprimer"></div>
 
   </div>
@@ -112,27 +139,14 @@
   <div class="bubble-floating" style="left:70%; width:50px; height:50px; animation-delay:7s;"></div>
   <div class="bubble-floating" style="left:90%; width:80px; height:80px; animation-delay:4s;"></div>
 
-
-  <script type="module">
-    import * as rec from "./recommender.js";
-    await rec.loadData();
-
+  <script>
     function navigate(url) {
       saveState();
       document.body.classList.add('fade-out');
       const dest = url + location.hash;
       document.body.addEventListener('animationend', () => window.location.href = dest, { once: true });
     }
-    const videos = (()=>{
-      try {
-        const v = localStorage.getItem('videosClean') || localStorage.getItem('videos');
-        return v ? JSON.parse(v) : [];
-      } catch(e){ return []; }
-    })();
-    const fieldSelect = document.getElementById('fieldSelect');
-    if(videos[0]) Object.keys(videos[0]).forEach(k => {
-      const o=document.createElement('option'); o.value=k; o.textContent=k; fieldSelect.appendChild(o);
-    });
+
 
     const cy = cytoscape({
       container: document.getElementById('cy'),
@@ -167,81 +181,26 @@
     });
 
     let nextNodeId = 0, nextEdgeId = 0;
-    function matchesExample(v, leaf){
-      let cur=leaf;
-      while(true){
-        const inc=cur.incoming('edge');
-        if(!inc.length) break;
-        const e=inc[0], parent=e.source();
-        const f=parent.data('field'), thr=parent.data('threshold');
-        if(f==null || thr==null) return false;
-        const dir=e.data('dir');
-        const val=Number(v[f]);
-        if(dir===0){ if(!(val<=thr)) return false; }
-        else { if(!(val>thr)) return false; }
-        cur=parent;
-      }
-      return true;
-    }
-    function refreshLeaves(){
-      cy.nodes('.leaf').forEach(n=>{
-        if(!videos.length) return;
-        const matched=videos.filter(v=>matchesExample(v,n));
-        if(!matched.length) return;
-        const counts={};
-        matched.forEach(v=>{counts[v.id]=(counts[v.id]||0)+1;});
-        let best=null, bestCount=-1;
-        for(const id in counts){ if(counts[id]>bestCount){bestCount=counts[id];best=id;} }
-        n.data('leafId',best);
-        const vid=videos.find(v=>v.id==best);
-        if(vid) n.data('label', vid.title || String(best));
-      });
-    }
-    function decisionDepth(node){
-      let depth=node.hasClass('decision')?1:0;
-      let cur=node;
-      while(true){
-        const inc=cur.incoming('edge');
-        if(!inc.length) break;
-        cur=inc[0].source();
-        if(cur.hasClass('decision')) depth++;
-      }
-      return depth;
-    }
     function saveState() {
-      refreshLeaves();
       const snap = cy.elements().jsons().map(e => {
         const out = { group: e.group, data: { ...e.data } };
         if (e.group === 'nodes' && e.position) out.position = { ...e.position };
         if (e.classes && e.classes.length) out.classes = e.classes;
         return out;
       });
-      const json = JSON.stringify(snap);
-      localStorage.setItem('decisionTree', json);
-      const comp = LZString.compressToEncodedURIComponent(json);
+      const comp = LZString.compressToEncodedURIComponent(JSON.stringify(snap));
       history.replaceState(null, '', '#' + comp);
-      localStorage.setItem('decisionTree', comp);
     }
     function loadState() {
-
-      let arr = null;
-      const h = location.hash.slice(1);
-      if (h) {
-        try { arr = JSON.parse(LZString.decompressFromEncodedURIComponent(h)); } catch(e) {}
-      }
-      if (!arr) {
-        const saved = localStorage.getItem('decisionTree');
-        if (saved) {
-          try { arr = JSON.parse(saved); } catch(e) {}
-        }
-      }
-      if (!arr) return;
-      cy.elements().remove(); cy.add(arr);
-      const nIds = cy.nodes().map(n => +n.id().slice(1)).filter(x=>!isNaN(x));
-      const eIds = cy.edges().map(e => +e.id().slice(1)).filter(x=>!isNaN(x));
-      nextNodeId = nIds.length ? Math.max(...nIds)+1 : 0;
-      nextEdgeId = eIds.length ? Math.max(...eIds)+1 : 0;
-
+      const h = location.hash.slice(1); if (!h) return;
+      try {
+        const arr = JSON.parse(LZString.decompressFromEncodedURIComponent(h));
+        cy.elements().remove(); cy.add(arr);
+        const nIds = cy.nodes().map(n => +n.id().slice(1)).filter(x=>!isNaN(x));
+        const eIds = cy.edges().map(e => +e.id().slice(1)).filter(x=>!isNaN(x));
+        nextNodeId = nIds.length ? Math.max(...nIds)+1 : 0;
+        nextEdgeId = eIds.length ? Math.max(...eIds)+1 : 0;
+      } catch(e) {}
     }
     window.addEventListener('popstate', loadState);
     loadState();
@@ -296,57 +255,31 @@
       line.setAttribute('visibility','hidden');
       if (dragging && origin && target && origin.id()!==target.id()) {
         const cnt = cy.edges().filter(e => e.source().id()===origin.id()).length;
-        if(target.hasClass('decision') && decisionDepth(origin) >=3){
-          alert('Profondeur maximale atteinte');
-        } else {
-          const lbl = cnt===0 ? '≤' : cnt===1 ? '>' : '';
-          cy.add({ group:'edges', data:{ id:'e'+nextEdgeId, source:origin.id(), target:target.id(), label:lbl, dir:cnt } });
-          nextEdgeId++; saveState();
-        }
+        const lbl = cnt===0 ? 'oui' : cnt===1 ? 'non' : '';
+        cy.add({ group:'edges', data:{ id:'e'+nextEdgeId, source:origin.id(), target:target.id(), label:lbl } });
+        nextEdgeId++; saveState();
       }
       origin = target = null; dragging = false;
     });
 
-    // Editing
+    // Inline editing
     const labelEditor = document.getElementById('labelEditor'); let editing = null;
-    const nodeModal = document.getElementById('nodeModal');
-    const thresholdInput = document.getElementById('thresholdInput');
-    let editingNode=null;
     function showEditor(ele,pos,text){ editing=ele;
       labelEditor.value = text||'';
       labelEditor.style.left = pos.x + 'px'; labelEditor.style.top = pos.y + 'px';
       labelEditor.style.display = 'block'; labelEditor.focus(); labelEditor.select();
     }
+    cy.on('dbltap','node', evt => showEditor(evt.target, evt.target.renderedPosition(), evt.target.data('label')));
     cy.on('dbltap','edge', evt => {
       const e = evt.target, mid=e.midpoint(), z=cy.zoom(), pan=cy.pan();
       const pos={ x: mid.x*z+pan.x, y: mid.y*z+pan.y };
       showEditor(e,pos,e.data('label'));
     });
-    cy.on('dbltap','node.decision', evt => {
-      editingNode=evt.target;
-      nodeModal.style.display='block';
-      const rect=document.getElementById('cy').getBoundingClientRect();
-      nodeModal.style.left=(rect.left+20)+'px';
-      nodeModal.style.top=(rect.top+20)+'px';
-      if(fieldSelect.options.length) fieldSelect.value=editingNode.data('field')||fieldSelect.options[0].value;
-      thresholdInput.value=editingNode.data('threshold')||0;
-    });
-    cy.on('dbltap','node.leaf', () => { saveState(); });
     labelEditor.addEventListener('keydown', e => { if(e.key==='Enter') commit(); else if(e.key==='Escape') cancel(); });
     labelEditor.addEventListener('blur', commit);
     function commit(){ if(editing && labelEditor.value.trim()){ editing.data('label',labelEditor.value.trim()); saveState(); }
       labelEditor.style.display='none'; editing=null; }
     function cancel(){ labelEditor.style.display='none'; editing=null; }
-    document.getElementById('modalOk').onclick=()=>{
-      if(editingNode){
-        editingNode.data('field', fieldSelect.value);
-        editingNode.data('threshold', Number(thresholdInput.value));
-        editingNode.data('label', `${fieldSelect.value} ≤ ${thresholdInput.value}?`);
-        saveState();
-      }
-      nodeModal.style.display='none'; editingNode=null;
-    };
-    document.getElementById('modalCancel').onclick=()=>{ nodeModal.style.display='none'; editingNode=null; };
 
     // Delete via trash
     let grab=null;
@@ -369,6 +302,5 @@
       document.getElementById('trash').classList.remove('hovered'); grab=null;
     });
   </script>
-
 </body>
 </html>

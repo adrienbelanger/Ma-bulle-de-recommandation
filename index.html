@@ -1,17 +1,28 @@
 <!DOCTYPE html>
-<html lang="fr-CA">
+<html lang="fr">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Ma bulle de recommandation</title>
-  <link rel="stylesheet" href="style/main.css">
   <style>
     body {
+      margin: 0;
+      padding: 0;
+      font-family: Verdana, sans-serif;
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
+      height: 100vh;
+      background: linear-gradient(to bottom, #5bc0eb, #20639b);
+      overflow: hidden;
+      position: relative;
+      opacity: 0;
+      animation: fadeIn 0.5s ease forwards;
     }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes fadeOut { from { opacity: 1; } to { opacity: 0; } }
+    .fade-out { animation: fadeOut 0.5s ease forwards; }
 
     h1 {
       font-size: 6rem;
@@ -20,6 +31,7 @@
       color: #ffffff;
       animation: fadeInUp 0.6s ease both;
     }
+    @keyframes fadeInUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
 
     /* Start arrow bubble */
     .start-bubble {
@@ -43,7 +55,30 @@
     }
     .start-bubble:hover { background: rgba(255,255,255,0.3); }
 
-    .bubble-floating { animation-duration: 20s; }
+  .bubble-floating {
+    position: absolute;
+    bottom: -100px;              /* start hidden below the bottom */
+    display: flex;               /* center contents */
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.1);
+    animation: floatUp 20s linear infinite;
+    pointer-events: none;
+    backdrop-filter: blur(4px);
+    z-index: 0;
+  }
+
+  @keyframes floatUp {
+    0% {
+      /* bottom is already -100px; transform for horizontal drift */
+      transform: translateX(0);
+    }
+    100% {
+      bottom: 110%;
+      transform: translateX(50px);
+    }
+  }
   </style>
 </head>
 <body>
@@ -58,9 +93,7 @@
   <div class="bubble-floating" style="width: 60px; height: 60px; left: 50%; animation-delay: 2s;">👍</div>
   <div class="bubble-floating" style="width: 40px; height: 40px; left: 70%; animation-delay: 7s;">❤️</div>
   <div class="bubble-floating" style="width: 60px; height: 60px; left: 85%; animation-delay: 3s;">👍</div>
-  <script type="module">
-    import * as rec from "./recommender.js";
-    await rec.loadData();
+  <script>
     document.getElementById('start-btn').addEventListener('click', () => {
       document.body.classList.add('fade-out');
       document.body.addEventListener('animationend', () => {
