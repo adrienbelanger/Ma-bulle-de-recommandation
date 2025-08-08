@@ -77,6 +77,7 @@
       background: #fff;
     }
 
+
   </style>
   <script src="https://unpkg.com/cytoscape@3.32.1/dist/cytoscape.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/lz-string@1.4.4/libs/lz-string.min.js"></script>
@@ -95,6 +96,11 @@
     </div>
     <div id="cy"></div>
     <input id="labelEditor" type="text" />
+    <div id="nodeModal">
+      <label>Champ: <select id="fieldSelect"></select></label>
+      <label>Seuil: <input id="thresholdInput" type="number"/></label>
+      <div><button id="modalOk">OK</button><button id="modalCancel">Annuler</button></div>
+    </div>
     <div id="trash" title="Glissez ici pour supprimer"></div>
 
   </div>
@@ -106,6 +112,263 @@
   <div class="bubble-floating" style="left:70%; width:50px; height:50px; animation-delay:7s;"></div>
   <div class="bubble-floating" style="left:90%; width:80px; height:80px; animation-delay:4s;"></div>
 
-    <script type="module" src="./src/main.js"></script>
+
+  <script type="module">
+    import * as rec from "./recommender.js";
+    await rec.loadData();
+
+    function navigate(url) {
+      saveState();
+      document.body.classList.add('fade-out');
+      const dest = url + location.hash;
+      document.body.addEventListener('animationend', () => window.location.href = dest, { once: true });
+    }
+    const videos = (()=>{
+      try {
+        const v = localStorage.getItem('videosClean') || localStorage.getItem('videos');
+        return v ? JSON.parse(v) : [];
+      } catch(e){ return []; }
+    })();
+    const fieldSelect = document.getElementById('fieldSelect');
+    if(videos[0]) Object.keys(videos[0]).forEach(k => {
+      const o=document.createElement('option'); o.value=k; o.textContent=k; fieldSelect.appendChild(o);
+    });
+
+    const cy = cytoscape({
+      container: document.getElementById('cy'),
+      elements: [],
+      style: [
+        { selector: 'node', style: {
+            'label': 'data(label)',
+            'text-valign': 'center', 'text-halign': 'center',
+            'color': '#fff', 'width': 'label', 'height': 50,
+            'background-color': '#666'
+          }
+        },
+        { selector: '.decision', style: {
+            'shape': 'diamond', 'background-color': '#4CAF50', 'padding': '30px'
+          }
+        },
+        { selector: '.leaf', style: {
+            'shape': 'roundrectangle', 'background-color': '#2196F3', 'padding': '10px'
+          }
+        },
+        { selector: 'edge', style: {
+            'width': 2, 'line-color': '#000', 'target-arrow-shape': 'triangle',
+            'target-arrow-color': '#000', 'arrow-scale': 1.2, 'curve-style': 'bezier',
+            'label': 'data(label)', 'text-margin-y': -10,
+            'text-background-opacity': 1, 'text-background-color': '#fff',
+            'text-background-shape': 'roundrectangle', 'text-background-padding': 2,
+            'font-size': 12, 'text-rotation': 'autorotate'
+          }
+        }
+      ],
+      layout: { name: 'preset' }
+    });
+
+    let nextNodeId = 0, nextEdgeId = 0;
+    function matchesExample(v, leaf){
+      let cur=leaf;
+      while(true){
+        const inc=cur.incoming('edge');
+        if(!inc.length) break;
+        const e=inc[0], parent=e.source();
+        const f=parent.data('field'), thr=parent.data('threshold');
+        if(f==null || thr==null) return false;
+        const dir=e.data('dir');
+        const val=Number(v[f]);
+        if(dir===0){ if(!(val<=thr)) return false; }
+        else { if(!(val>thr)) return false; }
+        cur=parent;
+      }
+      return true;
+    }
+    function refreshLeaves(){
+      cy.nodes('.leaf').forEach(n=>{
+        if(!videos.length) return;
+        const matched=videos.filter(v=>matchesExample(v,n));
+        if(!matched.length) return;
+        const counts={};
+        matched.forEach(v=>{counts[v.id]=(counts[v.id]||0)+1;});
+        let best=null, bestCount=-1;
+        for(const id in counts){ if(counts[id]>bestCount){bestCount=counts[id];best=id;} }
+        n.data('leafId',best);
+        const vid=videos.find(v=>v.id==best);
+        if(vid) n.data('label', vid.title || String(best));
+      });
+    }
+    function decisionDepth(node){
+      let depth=node.hasClass('decision')?1:0;
+      let cur=node;
+      while(true){
+        const inc=cur.incoming('edge');
+        if(!inc.length) break;
+        cur=inc[0].source();
+        if(cur.hasClass('decision')) depth++;
+      }
+      return depth;
+    }
+    function saveState() {
+      refreshLeaves();
+      const snap = cy.elements().jsons().map(e => {
+        const out = { group: e.group, data: { ...e.data } };
+        if (e.group === 'nodes' && e.position) out.position = { ...e.position };
+        if (e.classes && e.classes.length) out.classes = e.classes;
+        return out;
+      });
+      const json = JSON.stringify(snap);
+      localStorage.setItem('decisionTree', json);
+      const comp = LZString.compressToEncodedURIComponent(json);
+      history.replaceState(null, '', '#' + comp);
+      localStorage.setItem('decisionTree', comp);
+    }
+    function loadState() {
+
+      let arr = null;
+      const h = location.hash.slice(1);
+      if (h) {
+        try { arr = JSON.parse(LZString.decompressFromEncodedURIComponent(h)); } catch(e) {}
+      }
+      if (!arr) {
+        const saved = localStorage.getItem('decisionTree');
+        if (saved) {
+          try { arr = JSON.parse(saved); } catch(e) {}
+        }
+      }
+      if (!arr) return;
+      cy.elements().remove(); cy.add(arr);
+      const nIds = cy.nodes().map(n => +n.id().slice(1)).filter(x=>!isNaN(x));
+      const eIds = cy.edges().map(e => +e.id().slice(1)).filter(x=>!isNaN(x));
+      nextNodeId = nIds.length ? Math.max(...nIds)+1 : 0;
+      nextEdgeId = eIds.length ? Math.max(...eIds)+1 : 0;
+
+    }
+    window.addEventListener('popstate', loadState);
+    loadState();
+
+    function addNode(type) {
+      const id = (type==='decision'? 'd' : 'l') + nextNodeId++;
+      cy.add({ group: 'nodes', data: { id, label: type==='decision'? 'Décision':'Résultat' }, classes: type,
+        position: { x:100+Math.random()*400, y:100+Math.random()*300 } });
+      saveState();
+    }
+    document.getElementById('addDecision').onclick = () => addNode('decision');
+    document.getElementById('addLeaf').onclick     = () => addNode('leaf');
+    
+
+    // Linking logic
+    let origin = null, target = null, dragging = false;
+    const svgNS = "http://www.w3.org/2000/svg";
+    const svg = document.createElementNS(svgNS, 'svg');
+    svg.setAttribute('style', 'position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:5');
+    const defs = document.createElementNS(svgNS, 'defs');
+    const marker = document.createElementNS(svgNS, 'marker');
+    marker.setAttribute('id','arrowHead'); marker.setAttribute('markerWidth','6');
+    marker.setAttribute('markerHeight','6'); marker.setAttribute('refX','0');
+    marker.setAttribute('refY','3'); marker.setAttribute('orient','auto');
+    const path = document.createElementNS(svgNS,'path');
+    path.setAttribute('d','M0,0 L0,6 L6,3 z'); path.setAttribute('fill','#000');
+    marker.appendChild(path); defs.appendChild(marker); svg.appendChild(defs);
+    const line = document.createElementNS(svgNS,'line');
+    line.setAttribute('id','previewLine'); line.setAttribute('stroke','#000');
+    line.setAttribute('stroke-width','2'); line.setAttribute('marker-end','url(#arrowHead)');
+    line.setAttribute('visibility','hidden'); svg.appendChild(line);
+    document.getElementById('cy').appendChild(svg);
+
+    cy.on('cxttapstart','node', evt => {
+      origin = evt.target; dragging = false; target = null;
+      const p = origin.renderedPosition();
+      line.setAttribute('x1',p.x); line.setAttribute('y1',p.y);
+      line.setAttribute('x2',p.x); line.setAttribute('y2',p.y);
+      line.setAttribute('visibility','visible');
+    });
+    cy.on('cxtdrag', evt => {
+      if (!origin) return; dragging = true;
+      const rp = evt.renderedPosition; line.setAttribute('x2',rp.x); line.setAttribute('y2',rp.y);
+    });
+    cy.on('cxtdragover','node', evt => {
+      if (dragging && evt.target.id()!==origin.id()) target = evt.target;
+    });
+    cy.on('cxtdragout','node', evt => {
+      if (target && evt.target.id()===target.id()) target = null;
+    });
+    cy.on('cxttapend', () => {
+      line.setAttribute('visibility','hidden');
+      if (dragging && origin && target && origin.id()!==target.id()) {
+        const cnt = cy.edges().filter(e => e.source().id()===origin.id()).length;
+        if(target.hasClass('decision') && decisionDepth(origin) >=3){
+          alert('Profondeur maximale atteinte');
+        } else {
+          const lbl = cnt===0 ? '≤' : cnt===1 ? '>' : '';
+          cy.add({ group:'edges', data:{ id:'e'+nextEdgeId, source:origin.id(), target:target.id(), label:lbl, dir:cnt } });
+          nextEdgeId++; saveState();
+        }
+      }
+      origin = target = null; dragging = false;
+    });
+
+    // Editing
+    const labelEditor = document.getElementById('labelEditor'); let editing = null;
+    const nodeModal = document.getElementById('nodeModal');
+    const thresholdInput = document.getElementById('thresholdInput');
+    let editingNode=null;
+    function showEditor(ele,pos,text){ editing=ele;
+      labelEditor.value = text||'';
+      labelEditor.style.left = pos.x + 'px'; labelEditor.style.top = pos.y + 'px';
+      labelEditor.style.display = 'block'; labelEditor.focus(); labelEditor.select();
+    }
+    cy.on('dbltap','edge', evt => {
+      const e = evt.target, mid=e.midpoint(), z=cy.zoom(), pan=cy.pan();
+      const pos={ x: mid.x*z+pan.x, y: mid.y*z+pan.y };
+      showEditor(e,pos,e.data('label'));
+    });
+    cy.on('dbltap','node.decision', evt => {
+      editingNode=evt.target;
+      nodeModal.style.display='block';
+      const rect=document.getElementById('cy').getBoundingClientRect();
+      nodeModal.style.left=(rect.left+20)+'px';
+      nodeModal.style.top=(rect.top+20)+'px';
+      if(fieldSelect.options.length) fieldSelect.value=editingNode.data('field')||fieldSelect.options[0].value;
+      thresholdInput.value=editingNode.data('threshold')||0;
+    });
+    cy.on('dbltap','node.leaf', () => { saveState(); });
+    labelEditor.addEventListener('keydown', e => { if(e.key==='Enter') commit(); else if(e.key==='Escape') cancel(); });
+    labelEditor.addEventListener('blur', commit);
+    function commit(){ if(editing && labelEditor.value.trim()){ editing.data('label',labelEditor.value.trim()); saveState(); }
+      labelEditor.style.display='none'; editing=null; }
+    function cancel(){ labelEditor.style.display='none'; editing=null; }
+    document.getElementById('modalOk').onclick=()=>{
+      if(editingNode){
+        editingNode.data('field', fieldSelect.value);
+        editingNode.data('threshold', Number(thresholdInput.value));
+        editingNode.data('label', `${fieldSelect.value} ≤ ${thresholdInput.value}?`);
+        saveState();
+      }
+      nodeModal.style.display='none'; editingNode=null;
+    };
+    document.getElementById('modalCancel').onclick=()=>{ nodeModal.style.display='none'; editingNode=null; };
+
+    // Delete via trash
+    let grab=null;
+    cy.on('grab','node', evt => grab=evt.target);
+    cy.on('drag', evt => {
+      if(!grab) return;
+      const rect= document.getElementById('trash').getBoundingClientRect();
+      const cr=document.getElementById('cy').getBoundingClientRect();
+      const p=evt.renderedPosition; const ax=cr.left+p.x, ay=cr.top+p.y;
+      document.getElementById('trash').classList[ ax>=rect.left&&ax<=rect.right&&ay>=rect.top&&ay<=rect.bottom? 'add':'remove']('hovered');
+    });
+    cy.on('free','node', evt => {
+      if(!grab) return;
+      const rect= document.getElementById('trash').getBoundingClientRect();
+      const cr=document.getElementById('cy').getBoundingClientRect();
+      const p=evt.renderedPosition; const ax=cr.left+p.x, ay=cr.top+p.y;
+      if(ax>=rect.left&&ax<=rect.right&&ay>=rect.top&&ay<=rect.bottom) {
+        grab.connectedEdges().remove(); grab.remove();
+      } else saveState();
+      document.getElementById('trash').classList.remove('hovered'); grab=null;
+    });
+  </script>
+
 </body>
 </html>
