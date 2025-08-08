@@ -110,6 +110,7 @@
   </style>
   <script src="https://unpkg.com/cytoscape@3.32.1/dist/cytoscape.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/lz-string@1.4.4/libs/lz-string.min.js"></script>
+  <script src="rec.js"></script>
 </head>
 <body>
   <div class="nav-bubble nav-left" onclick="navigate('page4.html')">◀</div>
@@ -120,19 +121,15 @@
       <h2>Modèle Entraîné</h2>
       <div id="model-pred">Suggestion: <em>(aucune)</em></div>
       <div class="counter">✅: <span id="model-correct">0</span></div>
+      <div id="model-metrics"></div>
     </div>
     <div class="panel">
       <h2>Arbre de Décision</h2>
       <div id="cy"></div>
-      
-      <div class="choices">
-        <button onclick="vote('Dessins')">Dessins</button>
-        <button onclick="vote('Expériences')">Expériences</button>
-        <button onclick="vote('Animaux')">Animaux</button>
-        <button onclick="vote('Sciences')">Sciences</button>
-        <button onclick="vote('Jeux vidéo')">Jeux vidéo</button>
-      </div>
-      <div class="counter">✅: <span id="user-correct">0</span></div>
+
+      <div class="choices"></div>
+      <div class="counter">✅: <span id="tree-correct">0</span></div>
+      <div id="tree-metrics"></div>
     </div>
   </div>
   <div class="bubble-floating" style="left:10%;width:80px;height:80px;animation-delay:1s"></div>
@@ -142,101 +139,144 @@
   <div class="bubble-floating" style="left:90%;width:80px;height:80px;animation-delay:4s"></div>
 
 
-  <script type="module">
-    import * as rec from './rec.js';
+<script>
+function navigate(url){
+  document.body.classList.add('fade-out');
+  const dest = url + location.hash;
+  document.body.addEventListener('animationend', () => window.location.href = dest, { once: true });
+}
 
-    function navigate(url) {
-      document.body.classList.add('fade-out');
-      const dest = url + location.hash;
-      document.body.addEventListener('animationend', () => window.location.href = dest, { once: true });
-    }
-      window.navigate = navigate;
-    const cy = cytoscape({
-      container: document.getElementById('cy'),
-      elements: [],
-      style: [
-        { selector: 'node', style: {
-            'label': 'data(label)', 'text-valign': 'center', 'text-halign': 'center',
-            'color': '#fff', 'width': 'label', 'height': 50,
-            'background-color': '#666'
-          }
-        },
-        { selector: '.decision', style: {
-            'shape': 'diamond', 'background-color': '#4CAF50'
-          }
-        },
-        { selector: '.leaf', style: {
-            'shape': 'roundrectangle', 'background-color': '#2196F3'
-          }
-        },
-        { selector: 'edge', style: {
-            'width': 2, 'line-color': '#000', 'target-arrow-shape': 'triangle',
-            'target-arrow-color': '#000', 'arrow-scale': 1.2, 'curve-style': 'bezier',
-            'label': 'data(label)', 'text-background-opacity': 1,
-            'text-background-color': '#fff', 'text-background-shape': 'roundrectangle',
-            'text-background-padding': 2, 'font-size': 12, 'text-rotation': 'autorotate'
-          }
-        }
-      ],
-      layout: { name: 'breadthfirst' }
-    });
-    function loadTree() {
-      const hash = location.hash.slice(1);
-      if (!hash) return;
-      try {
-        const elements = JSON.parse(LZString.decompressFromEncodedURIComponent(hash));
-        cy.add(elements);
-      } catch (e) { console.error('Failed to load tree from hash:', e); }
-    }
-    loadTree();
-
-
-    const testData=[
-      {title:'Bataille de robots rétro',label:'Jeux vidéo'},
-      {title:'Expérience œuf rebondissant',label:'Expériences'},
-      {title:'Pourquoi avons‑nous des saisons',label:'Sciences'},
-      {title:'Premiers pas du koala',label:'Animaux'}
-    ];
-
-    const recVid={Dessins:'Aventure au chalet des amis',Expériences:'Réaction pâte à dents géante',Animaux:'Premiers pas du panda roux',Sciences:'Le système solaire expliqué','Jeux vidéo':'Construction d’un monde en blocs'};
-    const model=JSON.parse(localStorage.getItem('trainedModel')||'{}');
-    let modelCorrect=0,userCorrect=0,currentTest=0;
-
-    function showTest(){
-      if(currentTest>=testData.length){
-        document.getElementById('current-title').textContent='Fin des tests';
-        document.getElementById('model-pred').textContent='Terminé';
-        document.querySelector('.choices').innerHTML='';
-        return;
+const cy = cytoscape({
+  container: document.getElementById('cy'),
+  elements: [],
+  style: [
+    { selector: 'node', style: {
+        'label': 'data(label)', 'text-valign': 'center', 'text-halign': 'center',
+        'color': '#fff', 'width': 'label', 'height': 50, 'background-color': '#666'
       }
-      const t=testData[currentTest];
-      document.getElementById('current-title').textContent=`Visionné : ${t.title}`;
+    },
+    { selector: '.decision', style: { 'shape': 'diamond', 'background-color': '#4CAF50' } },
+    { selector: '.leaf', style: { 'shape': 'roundrectangle', 'background-color': '#2196F3' } },
+    { selector: 'edge', style: {
+        'width': 2, 'line-color': '#000', 'target-arrow-shape': 'triangle',
+        'target-arrow-color': '#000', 'arrow-scale': 1.2, 'curve-style': 'bezier',
+        'label': 'data(label)', 'text-background-opacity': 1,
+        'text-background-color': '#fff', 'text-background-shape': 'roundrectangle',
+        'text-background-padding': 2, 'font-size': 12, 'text-rotation': 'autorotate'
+      }
 
-      const cat=rec.predict(model,t.title);
-      const suggestion=recVid[cat]||'Aucune';
-
-      document.getElementById('model-pred').innerHTML=`Suggestion : <strong>${suggestion}</strong>`;
-      if(vid && vid.category===t.label){modelCorrect++;document.getElementById('model-correct').textContent=modelCorrect;}
-      const choiceDiv=document.querySelector('.choices');
-      choiceDiv.innerHTML='';
-      choices.forEach(cat=>{const b=document.createElement('button');b.textContent=cat;b.onclick=()=>vote(cat);choiceDiv.appendChild(b);});
     }
+  ],
+  layout: { name: 'breadthfirst' }
+});
 
-    function vote(cat){
-      if(currentTest>=testData.length)return;
-      const t=testData[currentTest];
-      if(cat===t.label){userCorrect++;document.getElementById('user-correct').textContent=userCorrect;}
-      currentTest++;
-      showTest();
+
+function loadTree(){
+  let raw = localStorage.getItem('decisionTree');
+  if(!raw){
+    const hash = location.hash.slice(1);
+    if(hash) raw = hash;
+  }
+  if(!raw) return;
+  try{
+    const elements = JSON.parse(LZString.decompressFromEncodedURIComponent(raw));
+    cy.add(elements);
+  }catch(e){
+    console.error('Failed to load tree', e);
+  }
+}
+loadTree();
+
+function predictTree(video){
+  if(cy.nodes().length===0) return null;
+  let node = cy.nodes().filter(n=>n.indegree()===0)[0];
+  while(node){
+    if(node.hasClass('leaf')){
+      const vid = data.videos.find(v=>v.title===node.data('label'));
+      return vid?vid.id:null;
     }
-      window.vote = vote;
-
-    loadData().then(data=>{
-      ({trainData,testData,recVid}=data);
-      trainModel();
-      showTest();
+    const edges = node.outgoers('edge');
+    let next = null;
+    edges.forEach(e=>{
+      const lbl = (e.data('label')||'').toLowerCase();
+      if(!next && lbl==='oui' && video.category===node.data('label')) next = e.target();
+      else if(!next && lbl!=='oui') next = e.target();
     });
-  </script>
+    node = next;
+  }
+  return null;
+}
+
+let data, current=0, modelHits=0, treeHits=0;
+const modelPred=[], treePred=[];
+
+rec.loadData().then(d=>{
+  data=d;
+  initButtons();
+  showTest();
+});
+
+function initButtons(){
+  const choices=document.querySelector('.choices');
+  const cats=[...new Set(data.videos.map(v=>v.category))];
+  cats.forEach(cat=>{
+    const b=document.createElement('button');
+    b.textContent=cat;
+    b.onclick=()=>vote(cat);
+    choices.appendChild(b);
+  });
+}
+
+function videoById(id){
+  return data.videos.find(v=>v.id===id);
+}
+
+function showTest(){
+  if(current>=data.test.length){
+    finish();
+    return;
+  }
+  const t=data.test[current];
+  document.getElementById('current-title').textContent=`Visionné : ${t.title}`;
+  const ranked=rec.rank(t.title,3);
+  const titles=ranked.map(id=>videoById(id)?.title||'Aucune');
+  document.getElementById('model-pred').innerHTML='Suggestions : <ol>'+titles.map(x=>`<li>${x}</li>`).join('')+'</ol>';
+  modelPred.push(ranked[0]);
+  if(ranked[0]===t.expected){
+    modelHits++;
+    document.getElementById('model-correct').textContent=modelHits;
+  }
+  const treeId=predictTree(t);
+  treePred.push(treeId);
+  if(treeId===t.expected){
+    treeHits++;
+    document.getElementById('tree-correct').textContent=treeHits;
+  }
+}
+
+function vote(cat){
+  current++;
+  showTest();
+}
+
+function finish(){
+  document.getElementById('current-title').textContent='Fin des tests';
+  document.getElementById('model-pred').textContent='Terminé';
+  document.querySelector('.choices').innerHTML='';
+  const total=data.test.length;
+  const truth=data.test.map(t=>videoById(t.expected).category);
+  const modelCats=modelPred.map(id=>videoById(id)?.category);
+  const treeCats=treePred.map(id=>videoById(id)?.category);
+  const f1Model=modelCats.filter((c,i)=>c===truth[i]).length/total;
+  const f1Tree=treeCats.filter((c,i)=>c===truth[i]).length/total;
+  const divModel=new Set(modelCats).size;
+  const divTree=new Set(treeCats).size;
+  const likeModel=modelPred.reduce((s,id)=>s+(videoById(id)?.likes||0),0)/modelPred.length;
+  const likeTree=treePred.reduce((s,id)=>s+(videoById(id)?.likes||0),0)/treePred.length;
+  document.getElementById('model-metrics').textContent=`F1: ${f1Model.toFixed(2)} | Diversité: ${divModel} | Likes moyens: ${likeModel.toFixed(1)}%`;
+  document.getElementById('tree-metrics').textContent=`F1: ${f1Tree.toFixed(2)} | Diversité: ${divTree} | Likes moyens: ${likeTree.toFixed(1)}%`;
+}
+</script>
 
 </body>
 </html>

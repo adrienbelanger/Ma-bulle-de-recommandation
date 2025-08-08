@@ -24,6 +24,7 @@ th{background:rgba(255,255,255,.2)}
 .bubble-floating{position:absolute;border-radius:50%;background:rgba(255,255,255,.1);animation:floatUp 30s linear infinite;pointer-events:none;backdrop-filter:blur(8px);z-index:0}
 @keyframes floatUp{0%{bottom:-100px;transform:translateX(0)}100%{bottom:110%;transform:translateX(50px)}}
 </style>
+<script src="rec.js"></script>
 </head>
 <body>
 <div class="nav-bubble nav-left" onclick="navigate('page3.html')">◀</div>
@@ -60,44 +61,23 @@ function navigate(u){
  document.body.addEventListener('animationend',()=>location.href=dest,{once:true});
 }
 
-const lambdaSlider=document.getElementById('lambdaSlider');
-const kSlider=document.getElementById('kSlider');
-const lambdaVal=document.getElementById('lambdaVal');
-const kVal=document.getElementById('kVal');
-const savedSettings=JSON.parse(localStorage.getItem('settings')||'{}');
-lambdaSlider.value=savedSettings.lambdaPopularity??0.5;
-kSlider.value=savedSettings.k??3;
-function persistSettings(){
- const s={lambdaPopularity:parseFloat(lambdaSlider.value),k:parseInt(kSlider.value)};
- lambdaVal.textContent=s.lambdaPopularity.toFixed(2);
- kVal.textContent=s.k;
- localStorage.setItem('settings',JSON.stringify(s));
-}
-lambdaSlider.addEventListener('input',persistSettings);
-kSlider.addEventListener('input',persistSettings);
-persistSettings();
-document.getElementById('trainBtn').addEventListener('click',()=>{
- const cleanData=JSON.parse(localStorage.getItem('videosClean')||'[]');
- if(cleanData.length===0){
-  document.getElementById('status').textContent='Aucune donnée';
-  return;
+
+document.getElementById('trainBtn').addEventListener('click', async () => {
+ document.getElementById('trainBtn').disabled = true;
+ document.getElementById('status').textContent = 'Chargement...';
+ const data = await rec.loadData();
+ document.getElementById('status').textContent = 'Génération des recommandations...';
+ let res = '<h3>Suggestions après test</h3><table><tr><th>Titre visionné</th><th>Vidéo suggérée</th><th></th></tr>';
+ for(const r of data.test){
+   const ranked = rec.rank(r.title,1);
+   const vid = data.videos.find(v=>v.id===ranked[0]);
+   const ok = ranked[0]===r.expected ? '✅' : '❌';
+   res += `<tr><td>${r.title}</td><td>${vid?vid.title:'Aucune'}</td><td>${ok}</td></tr>`;
  }
- document.getElementById('trainBtn').disabled=true;
- document.getElementById('status').textContent='Entraînement...';
- setTimeout(()=>{
-  const settings={lambdaPopularity:parseFloat(lambdaSlider.value),k:parseInt(kSlider.value)};
-  const {model,metrics}=rec.train(cleanData,settings);
-  localStorage.setItem('trainedModel',JSON.stringify(model));
-  localStorage.setItem('settings',JSON.stringify(settings));
-  let res='<h3>Résultats</h3><table><tr><th>Métrique</th><th>Valeur</th></tr>';
-  res+=`<tr><td>Précision</td><td>${metrics.precision.toFixed(2)}</td></tr>`;
-  res+=`<tr><td>Rappel</td><td>${metrics.recall.toFixed(2)}</td></tr>`;
-  res+=`<tr><td>Diversité</td><td>${metrics.diversity.toFixed(2)}</td></tr>`;
-  res+='</table>';
-  document.getElementById('results').innerHTML=res;
-  document.getElementById('status').textContent='Terminé';
-  document.getElementById('trainBtn').disabled=false;
- },100);
+ res += '</table>';
+ document.getElementById('results').innerHTML = res;
+ document.getElementById('status').textContent = 'Terminé';
+ document.getElementById('trainBtn').disabled = false;
 });
 
 </script>
