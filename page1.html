@@ -108,14 +108,25 @@
 
   <div class="container">
     <div class="quiz-panel">
-      <h2>Donnée et Prédiction</h2>
+      <h2>Donnée et prédiction</h2>
       <div class="question" id="question-text"></div>
       <div class="options" id="options"></div>
     </div>
     <div class="data-panel">
       <h2>Dataset</h2>
       <table>
-        <thead><tr><th>Âge</th><th>Vidéo vue</th><th>Catégorie</th><th>Prédiction</th></tr></thead>
+        <thead>
+          <tr>
+            <th>Âge</th>
+            <th>Vidéo vue</th>
+            <th>Catégorie</th>
+            <th>Prédiction</th>
+            <th>Vues</th>
+            <th>Ratio d'appréciation</th>
+            <th>Commentaires</th>
+            <th>Publiée il y a (jours)</th>
+          </tr>
+        </thead>
         <tbody id="dataset-body"></tbody>
       </table>
     </div>
@@ -153,7 +164,7 @@
     function renderQuestion() {
       const q = questions[current];
       questionText.classList.remove('fade'); void questionText.offsetWidth;
-      questionText.textContent = `Vous avez ${q.age} ans et venez de regarder « ${q.watched} ».`;
+      questionText.textContent = `Vous avez ${q.age} ans et venez de regarder « ${q.watched} ».`; 
       questionText.classList.add('fade');
       optionsDiv.innerHTML = '';
       q.options.forEach(opt => {
@@ -164,8 +175,12 @@
     }
     function addPrediction(choice) {
       const q = questions[current];
+      const views = Math.floor(Math.random() * 500000) + 100;
+      const likeRatio = Math.random().toFixed(2);
+      const commentCount = Math.floor(Math.random() * 10000);
+      const publishedDaysAgo = Math.floor(Math.random() * 365);
       const row = document.createElement('tr');
-      row.innerHTML = `<td>${q.age}</td><td>${q.watched}</td><td>${q.category}</td><td>${choice}</td>`;
+      row.innerHTML = `<td>${q.age}</td><td>${q.watched}</td><td>${q.category}</td><td>${choice}</td><td>${views}</td><td>${likeRatio}</td><td>${commentCount}</td><td>${publishedDaysAgo}</td>`;
       row.classList.add('row-fade-in'); tbody.appendChild(row);
       current++;
       if (current < questions.length) setTimeout(renderQuestion,300);
