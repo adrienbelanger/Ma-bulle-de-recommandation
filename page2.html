@@ -105,16 +105,50 @@
   <div class="bubble-floating" style="left:90%;width:80px;height:80px;animation-delay:4s;"></div>
 
   <script>
+    function saveCleanData() {
+      const rows = Array.from(document.querySelectorAll('#data-body tr'));
+      const data = rows.map(r => {
+        const cells = r.querySelectorAll('td');
+        return {
+          age: cells[0].textContent,
+          video: cells[1].textContent,
+          category: cells[2].textContent,
+          next: cells[3].textContent
+        };
+      });
+      localStorage.setItem('videosClean', JSON.stringify(data));
+    }
+
     function navigate(url) {
+      saveCleanData();
       document.body.classList.add('fade-out');
       const dest = url + location.hash;
       document.body.addEventListener('animationend', () => window.location.href = dest, { once: true });
     }
+
     function removeRow(btn) {
       const row = btn.closest('tr');
       row.classList.add('fade-out-row');
       row.addEventListener('animationend', () => row.remove());
     }
+
+    function restoreCleanData() {
+      const saved = localStorage.getItem('videosClean');
+      if (!saved) return;
+      try {
+        const data = JSON.parse(saved);
+        const tbody = document.getElementById('data-body');
+        tbody.innerHTML = '';
+        data.forEach(r => {
+          const tr = document.createElement('tr');
+          tr.innerHTML = `<td>${r.age}</td><td>${r.video}</td><td>${r.category}</td><td>${r.next}</td>` +
+            '<td><button class="clean-btn" onclick="removeRow(this)">✖</button></td>';
+          tbody.appendChild(tr);
+        });
+      } catch (e) {}
+    }
+
+    restoreCleanData();
   </script>
 </body>
 </html>

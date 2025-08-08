@@ -179,12 +179,22 @@
       layout: { name: 'breadthfirst' }
     });
     function loadTree() {
+      let elements = null;
       const hash = location.hash.slice(1);
-      if (!hash) return;
-      try {
-        const elements = JSON.parse(LZString.decompressFromEncodedURIComponent(hash));
+      if (hash) {
+        try { elements = JSON.parse(LZString.decompressFromEncodedURIComponent(hash)); } catch (e) {}
+      }
+      if (!elements) {
+        const saved = localStorage.getItem('decisionTree');
+        if (saved) {
+          try { elements = JSON.parse(saved); } catch (e) {}
+        }
+      }
+      if (elements) {
         cy.add(elements);
-      } catch (e) { console.error('Failed to load tree from hash:', e); }
+      } else {
+        console.error('Failed to load tree');
+      }
     }
     loadTree();
 
@@ -250,14 +260,31 @@
     ];
     const recVid={Dessins:'Aventure au chalet des amis',Expériences:'Réaction pâte à dents géante',Animaux:'Premiers pas du panda roux',Sciences:'Le système solaire expliqué','Jeux vidéo':'Construction d’un monde en blocs'};
     let vocab=[],word2idx={},centroids={},centroidNorm={};
+    let lambda=0,k=5;
     function buildVocab(){for(const r of trainData){for(const w of tokens(r.title)){if(word2idx[w]===undefined){word2idx[w]=vocab.length;vocab.push(w)}}}}
     function vecFromTitle(t){const v=new Uint8Array(vocab.length);for(const w of tokens(t)){const i=word2idx[w];if(i!==undefined)v[i]=1}return v}
     function cosine(a,b,nB){let dot=0,nA=0;for(let i=0;i<a.length;i++){if(a[i]){nA++;if(b[i])dot++}}if(nA===0||nB===0)return 0;return dot/Math.sqrt(nA*nB)}
     function trainModel(){buildVocab();const sums={},counts={};for(const r of trainData){const v=vecFromTitle(r.title);const lab=r.label;if(!sums[lab]){sums[lab]=new Float32Array(vocab.length);counts[lab]=0}for(let i=0;i<v.length;i++){sums[lab][i]+=v[i]}counts[lab]++}for(const lab in sums){for(let i=0;i<vocab.length;i++){sums[lab][i]/=counts[lab]}centroids[lab]=sums[lab];let n=0;for(let i=0;i<vocab.length;i++){if(centroids[lab][i]>0)n++}centroidNorm[lab]=Math.sqrt(n)}}
+    function loadModel(){
+      const m = localStorage.getItem('trainedModel');
+      if (!m) return false;
+      try {
+        const obj = JSON.parse(m);
+        vocab = obj.vocab || [];
+        word2idx = {};
+        vocab.forEach((w,i)=>word2idx[w]=i);
+        centroids = obj.centroids || {};
+        centroidNorm = obj.centroidNorm || {};
+        const st = localStorage.getItem('settings');
+        if (st) { const cfg = JSON.parse(st); lambda = cfg.lambda; k = cfg.k; }
+        return true;
+      } catch(e) {}
+      return false;
+    }
     function predict(t){const v=vecFromTitle(t);let best=null,bestScore=-1;for(const lab in centroids){const s=cosine(v,centroids[lab],centroidNorm[lab]);if(s>bestScore){bestScore=s;best=lab}}return best}
 
     let modelCorrect=0,userCorrect=0,currentTest=0;
-    trainModel();
+    if(!loadModel()) trainModel();
     function showTest(){
       if(currentTest>=testData.length){
         document.getElementById('current-title').textContent='Fin des tests';
