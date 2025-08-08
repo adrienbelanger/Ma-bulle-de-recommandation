@@ -1,0 +1,11 @@
+{
+  "name": "ma-bulle-de-recommandation",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "build": "parcel build index.html page*.html --dist-dir dist && mkdir -p dist/data && cp data/videos.json dist/data/"
+  },
+  "devDependencies": {
+    "parcel": "^2.13.0"
+  }
+}
