@@ -113,7 +113,8 @@
 </head>
 <body>
   <div class="nav-bubble nav-left" onclick="navigate('page4.html')">◀</div>
-  <div class="nav-bubble nav-right" onclick="navigate('page6.html')">▶</div>
+  <!-- Fin de l’activité -->
+  <div class="nav-bubble nav-right" onclick="navigate('index.html')">▶</div>
   <h1 id="current-title"></h1>
   <div class="content">
     <div class="panel">
@@ -124,14 +125,7 @@
     <div class="panel">
       <h2>Arbre de Décision</h2>
       <div id="cy"></div>
-      
-      <div class="choices">
-        <button onclick="vote('Dessins')">Dessins</button>
-        <button onclick="vote('Expériences')">Expériences</button>
-        <button onclick="vote('Animaux')">Animaux</button>
-        <button onclick="vote('Sciences')">Sciences</button>
-        <button onclick="vote('Jeux vidéo')">Jeux vidéo</button>
-      </div>
+      <div id="tree-pred">Arbre propose : <em>(aucune)</em></div>
       <div class="counter">✅: <span id="user-correct">0</span></div>
     </div>
   </div>
@@ -178,15 +172,42 @@
       ],
       layout: { name: 'breadthfirst' }
     });
-    function loadTree() {
-      const hash = location.hash.slice(1);
-      if (!hash) return;
+    // Restore elements saved on page3 (location.hash, LZString)
+    (function loadState(){
+      const h = location.hash.slice(1); if (!h) return;
       try {
-        const elements = JSON.parse(LZString.decompressFromEncodedURIComponent(hash));
-        cy.add(elements);
-      } catch (e) { console.error('Failed to load tree from hash:', e); }
+        const arr = JSON.parse(LZString.decompressFromEncodedURIComponent(h));
+        if (Array.isArray(arr)) cy.add(arr);
+      } catch(e) {}
+    })();
+
+    // Simple evaluator for decision nodes:
+    // If a decision label contains words after ":" or inside quotes,
+    // we check if any of those words appear in the title.
+    function norm(s){ return (s||'').toLowerCase(); }
+    function testDecision(label, title){
+      const t = norm(title), q = norm(label);
+      // grab tokens after ":" or inside "quotes"
+      let words = [];
+      const after = q.includes(':') ? q.split(':').slice(1).join(':').trim() : '';
+      if (after) words = words.concat(after.split('|').map(w=>w.trim()).filter(Boolean));
+      const quoted = [...q.matchAll(/"([^"]+)"/g)].map(m=>m[1].trim());
+      if (quoted.length) words = words.concat(quoted);
+      return words.length ? words.some(w=> t.includes(w)) : false;
     }
-    loadTree();
+    function classifyWithTree(title){
+      // pick a root: first decision node with no incoming edges, else first node
+      let root = cy.nodes('.decision').filter(n=>n.incomers('edge').length===0)[0] || cy.nodes()[0];
+      let cur = root, guard = 0;
+      while(cur && cur.hasClass('decision') && guard++ < 50){
+        const cond = testDecision(cur.data('label'), title);
+        const edges = cur.outgoers('edge');
+        const next = edges.filter(e => (e.data('label')||'').toLowerCase()===(cond?'oui':'non'))[0];
+        cur = next ? next.target() : null;
+      }
+      if (cur && cur.hasClass('leaf')) return cur.data('label') || null;
+      return null;
+    }
 
     // --- Données d'entraînement et modèle ---
     function tokens(s){return s.toLowerCase().split(/[^a-zàâçéèêëîïôûùüÿñæœ]+/).filter(Boolean)}
@@ -262,7 +283,7 @@
       if(currentTest>=testData.length){
         document.getElementById('current-title').textContent='Fin des tests';
         document.getElementById('model-pred').textContent='Terminé';
-        document.querySelector('.choices').innerHTML='';
+        document.getElementById('tree-pred').textContent='Terminé';
         return;
       }
       const t=testData[currentTest];
@@ -271,13 +292,11 @@
       const suggestion=recVid[cat]||'Aucune';
       document.getElementById('model-pred').innerHTML=`Suggestion : <strong>${suggestion}</strong>`;
       if(cat===t.label){modelCorrect++;document.getElementById('model-correct').textContent=modelCorrect;}
-    }
-    function vote(cat){
-      if(currentTest>=testData.length)return;
-      const t=testData[currentTest];
-      if(cat===t.label){userCorrect++;document.getElementById('user-correct').textContent=userCorrect;}
+      const treeCat = classifyWithTree(t.title);
+      document.getElementById('tree-pred').innerHTML = `Arbre propose : <strong>${treeCat||'(aucune)'}</strong>`;
+      if(treeCat===t.label){userCorrect++;document.getElementById('user-correct').textContent=userCorrect;}
       currentTest++;
-      showTest();
+      setTimeout(showTest,2000);
     }
     showTest();
   </script>
