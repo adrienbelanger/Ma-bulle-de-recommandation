@@ -103,8 +103,10 @@
     <div class="panel">
       <h2>Arbre de Décision</h2>
       <div id="cy"></div>
+
       <!-- NEW: four datapoints to choose from -->
       <div id="option-grid" class="options-grid"></div>
+
       <div class="counter">✅: <span id="user-correct">0</span></div>
     </div>
   </div>
@@ -159,6 +161,7 @@
         if (Array.isArray(arr)) cy.add(arr);
       } catch(e) {}
     })();
+
 
     // --- Données d'entraînement et modèle ---
     function tokens(s){return s.toLowerCase().split(/[^a-zàâçéèêëîïôûùüÿñæœ]+/).filter(Boolean)}
@@ -234,10 +237,12 @@
       if(currentTest>=testData.length){
         document.getElementById('current-title').textContent='Fin des tests';
         document.getElementById('model-pred').textContent='Terminé';
+
         return;
       }
       const t=testData[currentTest];
       document.getElementById('current-title').textContent=`Visionné : ${t.title}`;
+
       // Robot picks a category for this viewer history (kept minimal)
       const robotCat = predict(t.title);
       document.getElementById('model-pred').innerHTML = `Le robot a choisi : <strong>${robotCat}</strong>`;
@@ -293,6 +298,7 @@
       }
       // Next item after a short pause
       setTimeout(()=>{ currentTest++; showTest(); }, 900);
+
     }
     showTest();
   </script>
