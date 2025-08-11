@@ -8,7 +8,7 @@
     body {
       margin: 0; padding: 0; font-family: Verdana, sans-serif;
       background: linear-gradient(to bottom, #5bc0eb, #20639b);
-      height: 100vh; overflow: hidden; position: relative;
+      min-height: 100vh; overflow-x: hidden; overflow-y: auto; position: relative;
       display: flex; flex-direction: column;
       opacity: 0; animation: fadeIn 0.5s ease forwards;
     }
@@ -42,15 +42,16 @@
       color: white;
       display: flex;
       flex-direction: column;
-      overflow: hidden;
+      overflow-y: auto;
       box-shadow: 0 4px 10px rgba(0,0,0,0.2);
     }
 
     .panel h2 { margin-top: 0; font-size: 1.4rem; border-bottom: 1px solid rgba(255,255,255,0.3); padding-bottom: .5rem; margin-bottom: 1rem; }
-    #cy { flex: 1; background: #fff; border-radius: 8px; min-height: 260px; }
+    #cy { flex: 1 1 auto; min-height: 0; background: #fff; border-radius: 8px; }
     .counter { margin-top: .5rem; font-size: .95rem; }
+    .bottom { margin-top: auto; display: flex; flex-direction: column; gap: .75rem; }
     /* NEW: 4-card choice grid */
-    .options-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .75rem; margin-top: .75rem; }
+    .options-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .75rem; }
     .option-card { background: rgba(255,255,255,0.92); color:#222; border-radius: 10px; padding: .75rem; box-shadow: 0 2px 6px rgba(0,0,0,.15); cursor: pointer; user-select: none; }
     .option-card h3 { margin: 0 0 .25rem 0; font-size: 1rem; line-height: 1.2; }
     .option-card .tag { display:inline-block; font-size:.8rem; padding:2px 6px; border-radius:999px; background:#20639b; color:#fff; margin-bottom:.25rem; }
@@ -104,10 +105,12 @@
       <h2>Arbre de Décision</h2>
       <div id="cy"></div>
 
-      <!-- NEW: four datapoints to choose from -->
-      <div id="option-grid" class="options-grid"></div>
+      <div class="bottom">
+        <div class="counter">✅: <span id="user-correct">0</span></div>
 
-      <div class="counter">✅: <span id="user-correct">0</span></div>
+        <!-- NEW: four datapoints to choose from -->
+        <div id="option-grid" class="options-grid"></div>
+      </div>
     </div>
   </div>
   <div class="bubble-floating" style="left:10%;width:80px;height:80px;animation-delay:1s"></div>
