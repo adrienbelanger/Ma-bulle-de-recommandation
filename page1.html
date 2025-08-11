@@ -157,6 +157,8 @@
     const questionText = document.getElementById('question-text');
     const optionsDiv = document.getElementById('options');
     const tbody = document.getElementById('dataset-body');
+    const dataset = [];
+    localStorage.setItem('studentData', '[]');
     function renderQuestion() {
       const q = questions[current];
       questionText.classList.remove('fade'); void questionText.offsetWidth;
@@ -171,6 +173,9 @@
     }
     function addPrediction(choice) {
       const q = questions[current];
+      const entry = { age: q.age, watched: q.watched, category: q.category, prediction: choice };
+      dataset.push(entry);
+      localStorage.setItem('studentData', JSON.stringify(dataset));
       const row = document.createElement('tr');
       row.innerHTML = `<td>${q.age}</td><td>${q.watched}</td><td>${q.category}</td><td>${choice}</td>`;
       row.classList.add('row-fade-in');
