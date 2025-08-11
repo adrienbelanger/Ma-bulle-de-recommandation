@@ -6,7 +6,7 @@ classiques (**âge**, **vidéo vue**, **catégorie**, **prédiction de la procha
 vidéo**) et ajoutent quatre indicateurs de popularité :
 
 - **vues** (popularité générale)
-- **ratio d'appréciation** (likes ÷ réactions)
+- **J'aime** (nombre de likes)
 - **commentaires** (niveau de controverse)
 - **publiée il y a (jours)** (récence)
 

@@ -46,41 +46,19 @@
       box-shadow: 0 4px 10px rgba(0,0,0,0.2);
     }
 
-    .panel h2 {
-      margin-top: 0;
-      font-size: 1.4rem;
-      border-bottom: 1px solid rgba(255,255,255,0.3);
-      padding-bottom: 0.5rem;
-      margin-bottom: 1rem;
-    }
-
-    #cy {
-      flex: 1;
-      background: #fff;
-      border-radius: 8px;
-      margin-bottom: 1rem;
-    }
-
-    .choices button {
-      margin: 0.3rem 0;
-      padding: 0.6rem 1rem;
-      background: rgba(255,255,255,0.25);
-      color: white;
-      border: none;
-      border-radius: 6px;
-      cursor: pointer;
-      font-size: 1rem;
-      transition: background 0.2s;
-    }
-    .choices button:hover {
-      background: rgba(255,255,255,0.4);
-    }
-    .counter {
-      margin-top: auto;
-      font-size: 1.2rem;
-      text-align: right;
-      font-weight: bold;
-    }
+    .panel h2 { margin-top: 0; font-size: 1.4rem; border-bottom: 1px solid rgba(255,255,255,0.3); padding-bottom: .5rem; margin-bottom: 1rem; }
+    #cy { flex: 1; background: #fff; border-radius: 8px; min-height: 260px; }
+    .counter { margin-top: .5rem; font-size: .95rem; }
+    /* NEW: 4-card choice grid */
+    .options-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .75rem; margin-top: .75rem; }
+    .option-card { background: rgba(255,255,255,0.92); color:#222; border-radius: 10px; padding: .75rem; box-shadow: 0 2px 6px rgba(0,0,0,.15); cursor: pointer; user-select: none; }
+    .option-card h3 { margin: 0 0 .25rem 0; font-size: 1rem; line-height: 1.2; }
+    .option-card .tag { display:inline-block; font-size:.8rem; padding:2px 6px; border-radius:999px; background:#20639b; color:#fff; margin-bottom:.25rem; }
+    .option-meta { display:grid; grid-template-columns: 1fr auto; gap: 2px 8px; font-size:.85rem; }
+    .right { text-align:right; font-variant-numeric: tabular-nums; }
+    .option-card.selected { outline: 3px solid #20639b; }
+    .option-card.correct { outline: 3px solid #2ecc71; }
+    .option-card.incorrect { opacity: .65; }
 
     .nav-bubble {
       position: absolute; top: 1rem;
@@ -113,25 +91,20 @@
 </head>
 <body>
   <div class="nav-bubble nav-left" onclick="navigate('page4.html')">◀</div>
-  <div class="nav-bubble nav-right" onclick="navigate('page6.html')">▶</div>
+  <!-- Fin de l’activité -->
+  <div class="nav-bubble nav-right" onclick="navigate('index.html')">▶</div>
   <h1 id="current-title"></h1>
   <div class="content">
     <div class="panel">
       <h2>Modèle Entraîné</h2>
-      <div id="model-pred">Suggestion: <em>(aucune)</em></div>
+      <div id="model-pred">Le robot a choisi : <em>(aucune)</em></div>
       <div class="counter">✅: <span id="model-correct">0</span></div>
     </div>
     <div class="panel">
       <h2>Arbre de Décision</h2>
       <div id="cy"></div>
-      
-      <div class="choices">
-        <button onclick="vote('Dessins')">Dessins</button>
-        <button onclick="vote('Expériences')">Expériences</button>
-        <button onclick="vote('Animaux')">Animaux</button>
-        <button onclick="vote('Sciences')">Sciences</button>
-        <button onclick="vote('Jeux vidéo')">Jeux vidéo</button>
-      </div>
+      <!-- NEW: four datapoints to choose from -->
+      <div id="option-grid" class="options-grid"></div>
       <div class="counter">✅: <span id="user-correct">0</span></div>
     </div>
   </div>
@@ -178,15 +151,14 @@
       ],
       layout: { name: 'breadthfirst' }
     });
-    function loadTree() {
-      const hash = location.hash.slice(1);
-      if (!hash) return;
+    // Restore elements saved on page3 (location.hash, LZString)
+    (function loadState(){
+      const h = location.hash.slice(1); if (!h) return;
       try {
-        const elements = JSON.parse(LZString.decompressFromEncodedURIComponent(hash));
-        cy.add(elements);
-      } catch (e) { console.error('Failed to load tree from hash:', e); }
-    }
-    loadTree();
+        const arr = JSON.parse(LZString.decompressFromEncodedURIComponent(h));
+        if (Array.isArray(arr)) cy.add(arr);
+      } catch(e) {}
+    })();
 
     // --- Données d'entraînement et modèle ---
     function tokens(s){return s.toLowerCase().split(/[^a-zàâçéèêëîïôûùüÿñæœ]+/).filter(Boolean)}
@@ -262,22 +234,65 @@
       if(currentTest>=testData.length){
         document.getElementById('current-title').textContent='Fin des tests';
         document.getElementById('model-pred').textContent='Terminé';
-        document.querySelector('.choices').innerHTML='';
         return;
       }
       const t=testData[currentTest];
       document.getElementById('current-title').textContent=`Visionné : ${t.title}`;
-      const cat=predict(t.title);
-      const suggestion=recVid[cat]||'Aucune';
-      document.getElementById('model-pred').innerHTML=`Suggestion : <strong>${suggestion}</strong>`;
-      if(cat===t.label){modelCorrect++;document.getElementById('model-correct').textContent=modelCorrect;}
+      // Robot picks a category for this viewer history (kept minimal)
+      const robotCat = predict(t.title);
+      document.getElementById('model-pred').innerHTML = `Le robot a choisi : <strong>${robotCat}</strong>`;
+      if(robotCat===t.label){ modelCorrect++; document.getElementById('model-correct').textContent=modelCorrect; }
+      renderOptions(robotCat);
     }
-    function vote(cat){
-      if(currentTest>=testData.length)return;
-      const t=testData[currentTest];
-      if(cat===t.label){userCorrect++;document.getElementById('user-correct').textContent=userCorrect;}
-      currentTest++;
-      showTest();
+    // NEW: helper utils
+    function fmt(n){ try { return Number(n).toLocaleString('fr-CA'); } catch(e){ return String(n); } }
+    function rand(a,b){ return Math.floor(Math.random()*(b-a+1))+a; }
+    function shuffle(arr){ for(let i=arr.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [arr[i],arr[j]]=[arr[j],arr[i]]; } return arr; }
+
+    let currentOptions=[];
+    function generateFeatures(){
+      const vues = rand(1_000, 500_000);
+      const likes = Math.max(0, Math.round(vues * (0.05 + Math.random()*0.2)));   // 5–25% like rate
+      const comments = Math.max(0, Math.round(likes * (0.02 + Math.random()*0.2)));
+      const days = rand(0, 365);
+      return { vues, likes, comments, days };
+    }
+    function renderOptions(robotCat){
+      const t = testData[currentTest];
+      const correctCat = t.label;
+      const cats = Object.keys(recVid); // ['Dessins','Expériences','Animaux','Sciences','Jeux vidéo']
+      const decoys = cats.filter(c => c !== correctCat);
+      shuffle(decoys);
+      const chosen = shuffle([correctCat, ...decoys.slice(0,3)]); // 4 total
+      const grid = document.getElementById('option-grid');
+      grid.innerHTML = ''; currentOptions = [];
+      chosen.forEach(cat=>{
+        const f = generateFeatures();
+        const card = document.createElement('div');
+        card.className = 'option-card';
+        card.innerHTML = `\n          <h3>${recVid[cat]||'Vidéo suggérée'}</h3>\n          <div class="tag">${cat}</div>\n          <div class="option-meta">\n            <div>Vues</div><div class="right">${fmt(f.vues)}</div>\n            <div>J'aime</div><div class="right">${fmt(f.likes)}</div>\n            <div>Commentaires</div><div class="right">${fmt(f.comments)}</div>\n            <div>Publiée il y a</div><div class="right">${f.days} j</div>\n          </div>`;
+        card.addEventListener('click', ()=> choose(cat, card));
+        grid.appendChild(card);
+        currentOptions.push({cat, el: card});
+      });
+      // Highlight the robot's pick among the four (if present)
+      const match = currentOptions.find(o => o.cat === robotCat);
+      if (match) match.el.classList.add('selected');
+    }
+    function choose(cat, card){
+      if(currentTest>=testData.length) return;
+      const t = testData[currentTest];
+      const correctCat = t.label;
+      // Mark correct/incorrect
+      currentOptions.forEach(o => {
+        o.el.classList.add(o.cat===correctCat ? 'correct' : 'incorrect');
+      });
+      if(cat===correctCat){
+        userCorrect++;
+        document.getElementById('user-correct').textContent = userCorrect;
+      }
+      // Next item after a short pause
+      setTimeout(()=>{ currentTest++; showTest(); }, 900);
     }
     showTest();
   </script>
