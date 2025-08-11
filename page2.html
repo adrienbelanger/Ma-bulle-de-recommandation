@@ -69,7 +69,7 @@
             <th>Catégorie</th>
             <th>Vidéo suivante</th>
             <th>Vues</th>
-            <th>Ratio d'appréciation</th>
+            <th>J'aime</th>
             <th>Commentaires</th>
             <th>Publiée il y a (jours)</th>
             <th>Action</th>
@@ -114,6 +114,31 @@
       row.classList.add('fade-out-row');
       row.addEventListener('animationend', () => row.remove());
     }
+    // Convert old "ratio" values to raw like counts on the fly (and leave weird values weird)
+    (function convertRatioToLikes(){
+      const table = document.querySelector('table');
+      if(!table || !table.tHead) return;
+      const headCells = table.tHead.rows[0].cells;
+      let idxLikeCol = -1, idxVues = -1;
+      for (let i=0;i<headCells.length;i++){
+        const t = headCells[i].textContent.trim().toLowerCase();
+        if (t === 'vues') idxVues = i;
+        if (t.includes("j'aime") || t.includes('ratio')) idxLikeCol = i;
+      }
+      if (idxLikeCol < 0 || idxVues < 0) return;
+      headCells[idxLikeCol].textContent = "J'aime";
+      const rows = [...table.tBodies[0].rows];
+      rows.forEach(r=>{
+        const vues = parseFloat(r.cells[idxVues].textContent.replace(/\s/g,'')) || 0;
+        const raw = r.cells[idxLikeCol].textContent.trim().replace(',', '.');
+        const ratio = parseFloat(raw);
+        if (!isNaN(ratio)) {
+          const likes = Math.round(vues * ratio);
+          // keep invalid results as-is (negative or > vues) so students can spot & clean them
+          r.cells[idxLikeCol].textContent = String(likes);
+        }
+      });
+    })();
   </script>
 </body>
 </html>

@@ -113,7 +113,7 @@
       <div class="options" id="options"></div>
     </div>
     <div class="data-panel">
-      <h2>Dataset</h2>
+      <h2>Ta table de données</h2>
       <table>
         <thead>
           <tr>
@@ -121,10 +121,6 @@
             <th>Vidéo vue</th>
             <th>Catégorie</th>
             <th>Prédiction</th>
-            <th>Vues</th>
-            <th>Ratio d'appréciation</th>
-            <th>Commentaires</th>
-            <th>Publiée il y a (jours)</th>
           </tr>
         </thead>
         <tbody id="dataset-body"></tbody>
@@ -175,13 +171,10 @@
     }
     function addPrediction(choice) {
       const q = questions[current];
-      const views = Math.floor(Math.random() * 500000) + 100;
-      const likeRatio = Math.random().toFixed(2);
-      const commentCount = Math.floor(Math.random() * 10000);
-      const publishedDaysAgo = Math.floor(Math.random() * 365);
       const row = document.createElement('tr');
-      row.innerHTML = `<td>${q.age}</td><td>${q.watched}</td><td>${q.category}</td><td>${choice}</td><td>${views}</td><td>${likeRatio}</td><td>${commentCount}</td><td>${publishedDaysAgo}</td>`;
-      row.classList.add('row-fade-in'); tbody.appendChild(row);
+      row.innerHTML = `<td>${q.age}</td><td>${q.watched}</td><td>${q.category}</td><td>${choice}</td>`;
+      row.classList.add('row-fade-in');
+      tbody.appendChild(row);
       current++;
       if (current < questions.length) setTimeout(renderQuestion,300);
       else {
