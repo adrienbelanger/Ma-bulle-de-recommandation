@@ -217,13 +217,24 @@
       {title:'Course à obstacles néon',label:'Jeux vidéo'},
       {title:'Simulation ferme canadienne',label:'Jeux vidéo'}
     ];
-    const testData=[
+    const defaultTestData=[
       {title:'Bataille de robots rétro',label:'Jeux vidéo'},
       {title:'Expérience œuf rebondissant',label:'Expériences'},
       {title:'Pourquoi avons‑nous des saisons',label:'Sciences'},
       {title:'Premiers pas du koala',label:'Animaux'}
     ];
     const recVid={Dessins:'Aventure au chalet des amis',Expériences:'Réaction pâte à dents géante',Animaux:'Premiers pas du panda roux',Sciences:'Le système solaire expliqué','Jeux vidéo':'Construction d’un monde en blocs'};
+    const testData=(()=>{
+      try{
+        const raw=JSON.parse(localStorage.getItem('studentData')||'[]');
+        if(Array.isArray(raw)&&raw.length){
+          const catMap={Jeux:'Jeux vidéo',Cuisine:'Expériences',Sport:'Sciences',Mode:'Dessins',Animaux:'Animaux',Vlog:'Dessins'};
+          const mapped=raw.map(r=>({title:r.prediction,label:catMap[r.category]||r.category})).filter(r=>recVid[r.label]);
+          if(mapped.length) return mapped;
+        }
+      }catch(e){}
+      return defaultTestData;
+    })();
     let vocab=[],word2idx={},centroids={},centroidNorm={};
     function buildVocab(){for(const r of trainData){for(const w of tokens(r.title)){if(word2idx[w]===undefined){word2idx[w]=vocab.length;vocab.push(w)}}}}
     function vecFromTitle(t){const v=new Uint8Array(vocab.length);for(const w of tokens(t)){const i=word2idx[w];if(i!==undefined)v[i]=1}return v}
@@ -245,7 +256,8 @@
 
       // Robot picks a category for this viewer history (kept minimal)
       const robotCat = predict(t.title);
-      document.getElementById('model-pred').innerHTML = `Le robot a choisi : <strong>${robotCat}</strong>`;
+      const robotVid = recVid[robotCat] || '(aucune)';
+      document.getElementById('model-pred').innerHTML = `Le robot a choisi : <strong>${robotVid}</strong>`;
       if(robotCat===t.label){ modelCorrect++; document.getElementById('model-correct').textContent=modelCorrect; }
       renderOptions(robotCat);
     }
@@ -262,28 +274,31 @@
       const days = rand(0, 365);
       return { vues, likes, comments, days };
     }
-    function renderOptions(robotCat){
-      const t = testData[currentTest];
-      const correctCat = t.label;
-      const cats = Object.keys(recVid); // ['Dessins','Expériences','Animaux','Sciences','Jeux vidéo']
-      const decoys = cats.filter(c => c !== correctCat);
-      shuffle(decoys);
-      const chosen = shuffle([correctCat, ...decoys.slice(0,3)]); // 4 total
-      const grid = document.getElementById('option-grid');
-      grid.innerHTML = ''; currentOptions = [];
-      chosen.forEach(cat=>{
-        const f = generateFeatures();
-        const card = document.createElement('div');
-        card.className = 'option-card';
-        card.innerHTML = `\n          <h3>${recVid[cat]||'Vidéo suggérée'}</h3>\n          <div class="tag">${cat}</div>\n          <div class="option-meta">\n            <div>Vues</div><div class="right">${fmt(f.vues)}</div>\n            <div>J'aime</div><div class="right">${fmt(f.likes)}</div>\n            <div>Commentaires</div><div class="right">${fmt(f.comments)}</div>\n            <div>Publiée il y a</div><div class="right">${f.days} j</div>\n          </div>`;
-        card.addEventListener('click', ()=> choose(cat, card));
-        grid.appendChild(card);
-        currentOptions.push({cat, el: card});
-      });
-      // Highlight the robot's pick among the four (if present)
-      const match = currentOptions.find(o => o.cat === robotCat);
-      if (match) match.el.classList.add('selected');
-    }
+      function renderOptions(robotCat){
+        const t = testData[currentTest];
+        const correctCat = t.label;
+        const cats = Object.keys(recVid); // ['Dessins','Expériences','Animaux','Sciences','Jeux vidéo']
+        const optionCats=[correctCat];
+        if(robotCat!==correctCat) optionCats.push(robotCat);
+        const remaining=cats.filter(c=>!optionCats.includes(c));
+        shuffle(remaining);
+        while(optionCats.length<4&&remaining.length) optionCats.push(remaining.shift());
+        shuffle(optionCats);
+        const grid = document.getElementById('option-grid');
+        grid.innerHTML = ''; currentOptions = [];
+        optionCats.forEach(cat=>{
+          const f = generateFeatures();
+          const card = document.createElement('div');
+          card.className = 'option-card';
+          card.innerHTML = `\n          <h3>${recVid[cat]||'Vidéo suggérée'}</h3>\n          <div class="tag">${cat}</div>\n          <div class="option-meta">\n            <div>Vues</div><div class="right">${fmt(f.vues)}</div>\n            <div>J'aime</div><div class="right">${fmt(f.likes)}</div>\n            <div>Commentaires</div><div class="right">${fmt(f.comments)}</div>\n            <div>Publiée il y a</div><div class="right">${f.days} j</div>\n          </div>`;
+          card.addEventListener('click', ()=> choose(cat, card));
+          grid.appendChild(card);
+          currentOptions.push({cat, el: card});
+        });
+        // Highlight the robot's pick among the four
+        const match = currentOptions.find(o => o.cat === robotCat);
+        if (match) match.el.classList.add('selected');
+      }
     function choose(cat, card){
       if(currentTest>=testData.length) return;
       const t = testData[currentTest];
