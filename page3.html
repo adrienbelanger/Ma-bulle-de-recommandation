@@ -195,9 +195,11 @@
       layout: { name: 'preset' }
     });
     const cyEl = document.getElementById('cy');
+
     if (window.ResizeObserver) {
       new ResizeObserver(() => cy.resize()).observe(cyEl);
     }
+
     requestAnimationFrame(() => { cy.resize(); cy.fit(null, 20); });
     window.addEventListener('resize', () => cy.resize());
 
