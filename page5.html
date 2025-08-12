@@ -184,20 +184,28 @@
     window.addEventListener('resize', () => cy.resize());
     (function loadState(){
       const h = location.hash.slice(1);
-      if (!h) return;
+      if(!h) return;
+      let snap;
       try {
-        const arr = JSON.parse(LZString.decompressFromEncodedURIComponent(h));
-        if (Array.isArray(arr) && arr.length) {
-          const nodes = arr.filter(e => e.group === 'nodes');
-          const edges = arr.filter(e => e.group === 'edges');
-          cy.add(nodes);
-          cy.add(edges);
-          const hasPos = nodes.some(e => e.position);
-          if (!hasPos) cy.layout({ name: 'breadthfirst', directed: true, padding: 24 }).run();
-          cy.fit(null, 20);
-          cy.resize();
-        }
-      } catch(e) {}
+
+        snap = JSON.parse(LZString.decompressFromEncodedURIComponent(h));
+      } catch(e) { return; }
+      if(!Array.isArray(snap) || !snap.length) return;
+      const clean = ele => {
+        const out = { group: ele.group, data: { ...ele.data } };
+        if(ele.group === 'nodes' && ele.position) out.position = { ...ele.position };
+        if(ele.classes) out.classes = ele.classes;
+        return out;
+      };
+      const nodes = snap.filter(e => e.group === 'nodes').map(clean);
+      const edges = snap.filter(e => e.group === 'edges').map(clean);
+      cy.add(nodes);
+      cy.add(edges);
+      const hasPos = nodes.some(e => e.position);
+      if (!hasPos) cy.layout({ name: 'breadthfirst', directed: true, padding: 24 }).run();
+      cy.fit(null, 20);
+      cy.resize();
+
     })();
 
 
