@@ -48,7 +48,7 @@
 
     .panel h2 { margin-top: 0; font-size: 1.4rem; border-bottom: 1px solid rgba(255,255,255,0.3); padding-bottom: .5rem; margin-bottom: 1rem; }
 
-    #cy { flex: 1 1 auto; min-height: 0; background: #fff; border-radius: 8px; }
+    #cy { flex: 1 1 auto; min-height: 0; background: #fff; border-radius: 0; }
 
     .counter { margin-top: .5rem; font-size: .95rem; }
     .bottom { margin-top: auto; display: flex; flex-direction: column; gap: .75rem; }
@@ -134,36 +134,62 @@
       elements: [],
       style: [
         { selector: 'node', style: {
-            'label': 'data(label)', 'text-valign': 'center', 'text-halign': 'center',
-            'color': '#fff', 'width': 'label', 'height': 50,
+            'label': 'data(label)',
+            'text-valign': 'center',
+            'text-halign': 'center',
+            'color': '#fff',
+            'width': 'label',
+            'height': 50,
             'background-color': '#666'
           }
         },
         { selector: '.decision', style: {
-            'shape': 'diamond', 'background-color': '#4CAF50'
+            'shape': 'diamond',
+            'background-color': '#4CAF50',
+            'padding': '30px'
           }
         },
         { selector: '.leaf', style: {
-            'shape': 'roundrectangle', 'background-color': '#2196F3'
+            'shape': 'roundrectangle',
+            'background-color': '#2196F3',
+            'padding': '10px'
           }
         },
         { selector: 'edge', style: {
-            'width': 2, 'line-color': '#000', 'target-arrow-shape': 'triangle',
-            'target-arrow-color': '#000', 'arrow-scale': 1.2, 'curve-style': 'bezier',
-            'label': 'data(label)', 'text-background-opacity': 1,
-            'text-background-color': '#fff', 'text-background-shape': 'roundrectangle',
-            'text-background-padding': 2, 'font-size': 12, 'text-rotation': 'autorotate'
+            'width': 2,
+            'line-color': '#000',
+            'target-arrow-shape': 'triangle',
+            'target-arrow-color': '#000',
+            'arrow-scale': 1.2,
+            'curve-style': 'bezier',
+            'label': 'data(label)',
+            'text-background-opacity': 1,
+            'text-background-color': '#fff',
+            'text-background-shape': 'roundrectangle',
+            'text-background-padding': 2,
+            'font-size': 12,
+            'text-rotation': 'autorotate'
           }
         }
       ],
-      layout: { name: 'breadthfirst' }
+      layout: { name: 'preset' }
     });
-    // Restore elements saved on page3 (location.hash, LZString)
+    const cyEl = document.getElementById('cy');
+    new ResizeObserver(() => cy.resize()).observe(cyEl);
+    requestAnimationFrame(() => { cy.resize(); cy.fit(null, 20); });
+    window.addEventListener('resize', () => cy.resize());
     (function loadState(){
-      const h = location.hash.slice(1); if (!h) return;
+      const h = location.hash.slice(1);
+      if (!h) return;
       try {
         const arr = JSON.parse(LZString.decompressFromEncodedURIComponent(h));
-        if (Array.isArray(arr)) cy.add(arr);
+        if (Array.isArray(arr) && arr.length) {
+          cy.add(arr);
+          const hasPos = arr.some(e => e.group === 'nodes' && e.position);
+          if (!hasPos) cy.layout({ name: 'breadthfirst', directed: true, padding: 24 }).run();
+          cy.fit(null, 20);
+          cy.resize();
+        }
       } catch(e) {}
     })();
 

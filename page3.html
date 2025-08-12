@@ -154,31 +154,50 @@
       style: [
         { selector: 'node', style: {
             'label': 'data(label)',
-            'text-valign': 'center', 'text-halign': 'center',
-            'color': '#fff', 'width': 'label', 'height': 50,
+            'text-valign': 'center',
+            'text-halign': 'center',
+            'color': '#fff',
+            'width': 'label',
+            'height': 50,
             'background-color': '#666'
           }
         },
         { selector: '.decision', style: {
-            'shape': 'diamond', 'background-color': '#4CAF50', 'padding': '30px'
+            'shape': 'diamond',
+            'background-color': '#4CAF50',
+            'padding': '30px'
           }
         },
         { selector: '.leaf', style: {
-            'shape': 'roundrectangle', 'background-color': '#2196F3', 'padding': '10px'
+            'shape': 'roundrectangle',
+            'background-color': '#2196F3',
+            'padding': '10px'
           }
         },
         { selector: 'edge', style: {
-            'width': 2, 'line-color': '#000', 'target-arrow-shape': 'triangle',
-            'target-arrow-color': '#000', 'arrow-scale': 1.2, 'curve-style': 'bezier',
-            'label': 'data(label)', 'text-margin-y': -10,
-            'text-background-opacity': 1, 'text-background-color': '#fff',
-            'text-background-shape': 'roundrectangle', 'text-background-padding': 2,
-            'font-size': 12, 'text-rotation': 'autorotate'
+            'width': 2,
+            'line-color': '#000',
+            'target-arrow-shape': 'triangle',
+            'target-arrow-color': '#000',
+            'arrow-scale': 1.2,
+            'curve-style': 'bezier',
+            'label': 'data(label)',
+            'text-margin-y': -10,
+            'text-background-opacity': 1,
+            'text-background-color': '#fff',
+            'text-background-shape': 'roundrectangle',
+            'text-background-padding': 2,
+            'font-size': 12,
+            'text-rotation': 'autorotate'
           }
         }
       ],
       layout: { name: 'preset' }
     });
+    const cyEl = document.getElementById('cy');
+    new ResizeObserver(() => cy.resize()).observe(cyEl);
+    requestAnimationFrame(() => { cy.resize(); cy.fit(null, 20); });
+    window.addEventListener('resize', () => cy.resize());
 
     let nextNodeId = 0, nextEdgeId = 0;
     function saveState() {
@@ -192,10 +211,16 @@
       history.replaceState(null, '', '#' + comp);
     }
     function loadState() {
-      const h = location.hash.slice(1); if (!h) return;
+      const h = location.hash.slice(1);
+      if (!h) return;
       try {
         const arr = JSON.parse(LZString.decompressFromEncodedURIComponent(h));
-        cy.elements().remove(); cy.add(arr);
+        cy.elements().remove();
+        cy.add(arr);
+        const hasPos = Array.isArray(arr) && arr.some(e => e.group === 'nodes' && e.position);
+        if (!hasPos) cy.layout({ name: 'breadthfirst', directed: true, padding: 24 }).run();
+        cy.fit(null, 20);
+        cy.resize();
         const nIds = cy.nodes().map(n => +n.id().slice(1)).filter(x=>!isNaN(x));
         const eIds = cy.edges().map(e => +e.id().slice(1)).filter(x=>!isNaN(x));
         nextNodeId = nIds.length ? Math.max(...nIds)+1 : 0;
