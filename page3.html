@@ -200,39 +200,64 @@
       new ResizeObserver(() => cy.resize()).observe(cyEl);
     }
 
-    requestAnimationFrame(() => { cy.resize(); cy.fit(null, 20); });
+    requestAnimationFrame(() => { cy.resize(); });
     window.addEventListener('resize', () => cy.resize());
 
     let nextNodeId = 0, nextEdgeId = 0;
-    function saveState() {
-      const snap = cy.elements().jsons().map(e => {
-        const out = { group: e.group, data: { ...e.data } };
-        if (e.group === 'nodes' && e.position) out.position = { ...e.position };
-        if (e.classes && e.classes.length) out.classes = e.classes;
-        return out;
-      });
-      const comp = LZString.compressToEncodedURIComponent(JSON.stringify(snap));
+
+    function updateURL(arr){
+      const comp = LZString.compressToEncodedURIComponent(JSON.stringify(arr));
       history.replaceState(null, '', '#' + comp);
     }
-    function loadState() {
-      const h = location.hash.slice(1);
-      if (!h) return;
-      try {
-        const arr = JSON.parse(LZString.decompressFromEncodedURIComponent(h));
-        cy.elements().remove();
-        cy.add(arr);
-        const hasPos = Array.isArray(arr) && arr.some(e => e.group === 'nodes' && e.position);
-        if (!hasPos) cy.layout({ name: 'breadthfirst', directed: true, padding: 24 }).run();
-        cy.fit(null, 20);
-        cy.resize();
-        const nIds = cy.nodes().map(n => +n.id().slice(1)).filter(x=>!isNaN(x));
-        const eIds = cy.edges().map(e => +e.id().slice(1)).filter(x=>!isNaN(x));
-        nextNodeId = nIds.length ? Math.max(...nIds)+1 : 0;
-        nextEdgeId = eIds.length ? Math.max(...eIds)+1 : 0;
-      } catch(e) {}
+
+    function saveState(){
+      const snap = cy.elements().jsons().map(ele => {
+        const out = { group: ele.group, data: { ...ele.data } };
+        if(ele.group === 'nodes' && ele.position) out.position = { ...ele.position };
+        if(ele.classes && ele.classes.length) out.classes = ele.classes;
+        return out;
+      });
+      updateURL(snap);
     }
-    window.addEventListener('popstate', loadState);
-    loadState();
+
+    function loadFromURL(){
+      const h = location.hash.slice(1);
+      if(!h) return null;
+      try{
+        return JSON.parse(LZString.decompressFromEncodedURIComponent(h));
+      }catch(e){
+        return null;
+      }
+    }
+
+    function restoreGraph(snap){
+      cy.elements().remove();
+      if(!Array.isArray(snap) || !snap.length){
+        nextNodeId = nextEdgeId = 0;
+        return;
+      }
+      const clean = ele => {
+        const out = { group: ele.group, data: { ...ele.data } };
+        if(ele.group === 'nodes' && ele.position) out.position = { ...ele.position };
+        if(ele.classes) out.classes = ele.classes;
+        return out;
+      };
+      const nodes = snap.filter(e => e.group === 'nodes').map(clean);
+      const edges = snap.filter(e => e.group === 'edges').map(clean);
+      cy.add(nodes);
+      cy.add(edges);
+      const nIds = cy.nodes().map(n => +n.id().slice(1)).filter(x => !isNaN(x));
+      const eIds = cy.edges().map(e => +e.id().slice(1)).filter(x => !isNaN(x));
+      nextNodeId = nIds.length ? Math.max(...nIds) + 1 : 0;
+      nextEdgeId = eIds.length ? Math.max(...eIds) + 1 : 0;
+    }
+
+    window.addEventListener('popstate', () => {
+      const snap = loadFromURL();
+      if(snap) restoreGraph(snap);
+    });
+    const initial = loadFromURL();
+    if(initial) restoreGraph(initial); else saveState();
 
     function addNode(type) {
       const id = (type==='decision'? 'd' : 'l') + nextNodeId++;
@@ -317,8 +342,6 @@
           }
         });
         nextEdgeId++;
-        cy.fit(null, 20);
-        cy.resize();
         saveState();
       }
       linkOrigin = linkTarget = null;
