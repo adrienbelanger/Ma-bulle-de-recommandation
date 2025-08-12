@@ -220,11 +220,12 @@
       try {
         const arr = JSON.parse(LZString.decompressFromEncodedURIComponent(h));
         cy.elements().remove();
-        cy.add(arr);
-        const hasPos = Array.isArray(arr) && arr.some(e => e.group === 'nodes' && e.position);
+        const nodes = Array.isArray(arr) ? arr.filter(e => e.group === 'nodes') : [];
+        const edges = Array.isArray(arr) ? arr.filter(e => e.group === 'edges') : [];
+        cy.add(nodes);
+        cy.add(edges);
+        const hasPos = nodes.some(e => e.position);
         if (!hasPos) cy.layout({ name: 'breadthfirst', directed: true, padding: 24 }).run();
-        cy.fit(null, 20);
-        cy.resize();
         const nIds = cy.nodes().map(n => +n.id().slice(1)).filter(x=>!isNaN(x));
         const eIds = cy.edges().map(e => +e.id().slice(1)).filter(x=>!isNaN(x));
         nextNodeId = nIds.length ? Math.max(...nIds)+1 : 0;
@@ -317,8 +318,6 @@
           }
         });
         nextEdgeId++;
-        cy.fit(null, 20);
-        cy.resize();
         saveState();
       }
       linkOrigin = linkTarget = null;

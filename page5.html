@@ -188,8 +188,11 @@
       try {
         const arr = JSON.parse(LZString.decompressFromEncodedURIComponent(h));
         if (Array.isArray(arr) && arr.length) {
-          cy.add(arr);
-          const hasPos = arr.some(e => e.group === 'nodes' && e.position);
+          const nodes = arr.filter(e => e.group === 'nodes');
+          const edges = arr.filter(e => e.group === 'edges');
+          cy.add(nodes);
+          cy.add(edges);
+          const hasPos = nodes.some(e => e.position);
           if (!hasPos) cy.layout({ name: 'breadthfirst', directed: true, padding: 24 }).run();
           cy.fit(null, 20);
           cy.resize();
