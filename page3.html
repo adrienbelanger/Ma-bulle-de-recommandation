@@ -195,7 +195,11 @@
       layout: { name: 'preset' }
     });
     const cyEl = document.getElementById('cy');
-    new ResizeObserver(() => cy.resize()).observe(cyEl);
+
+    if (window.ResizeObserver) {
+      new ResizeObserver(() => cy.resize()).observe(cyEl);
+    }
+
     requestAnimationFrame(() => { cy.resize(); cy.fit(null, 20); });
     window.addEventListener('resize', () => cy.resize());
 
@@ -240,18 +244,85 @@
     document.getElementById('addLeaf').onclick     = () => addNode('leaf');
     
 
-    // Linking logic: tap source → tap target
-    let linkStart = null;
-    cy.on('tap','node', evt => {
-      if (!linkStart) { linkStart = evt.target; return; }
-      const origin = linkStart, target = evt.target;
-      if (origin.id() !== target.id()) {
-        const cnt = cy.edges().filter(e => e.source().id()===origin.id()).length;
+    // --- SVG preview line ---
+    const svgNS = "http://www.w3.org/2000/svg";
+    const svg = document.createElementNS(svgNS, 'svg');
+    svg.setAttribute('style', 'position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:10');
+    const defs = document.createElementNS(svgNS, 'defs');
+    const marker = document.createElementNS(svgNS, 'marker');
+    marker.setAttribute('id','arrowHead');
+    marker.setAttribute('markerWidth','6');
+    marker.setAttribute('markerHeight','6');
+    marker.setAttribute('refX','0');
+    marker.setAttribute('refY','3');
+    marker.setAttribute('orient','auto');
+    const path = document.createElementNS(svgNS,'path');
+    path.setAttribute('d','M0,0 L0,6 L6,3 z');
+    path.setAttribute('fill','#000');
+    marker.appendChild(path);
+    defs.appendChild(marker);
+    svg.appendChild(defs);
+    const line = document.createElementNS(svgNS,'line');
+    line.setAttribute('id','previewLine');
+    line.setAttribute('stroke','#000');
+    line.setAttribute('stroke-width','2');
+    line.setAttribute('marker-end','url(#arrowHead)');
+    line.setAttribute('visibility','hidden');
+    svg.appendChild(line);
+    cy.container().appendChild(svg);
+
+    // --- Linking logic (right-drag) ---
+    let linkOrigin = null, linkTarget = null, didDrag = false;
+    cy.on('cxttapstart','node', evt => {
+      linkOrigin = evt.target; didDrag = false; linkTarget = null;
+      const p = linkOrigin.renderedPosition();
+      line.setAttribute('x1',p.x);
+      line.setAttribute('y1',p.y);
+      line.setAttribute('x2',p.x);
+      line.setAttribute('y2',p.y);
+      line.setAttribute('visibility','visible');
+    });
+    cy.on('cxtdrag', evt => {
+      if (!linkOrigin) return;
+      didDrag = true;
+      const rp = evt.renderedPosition;
+      line.setAttribute('x2',rp.x);
+      line.setAttribute('y2',rp.y);
+    });
+    cy.on('cxtdragover','node', evt => {
+      if (didDrag && evt.target.id()!==linkOrigin.id()) {
+        linkTarget = evt.target;
+      }
+    });
+    cy.on('cxtdragout','node', evt => {
+      if (linkTarget && evt.target.id()===linkTarget.id()) {
+        linkTarget = null;
+      }
+    });
+    cy.on('cxttapend', () => {
+      line.setAttribute('visibility','hidden');
+      if (didDrag && linkOrigin && linkTarget &&
+          linkOrigin.id()!==linkTarget.id()) {
+        const cnt = cy.edges()
+          .filter(e => e.source().id()===linkOrigin.id())
+          .length;
         const lbl = cnt===0 ? 'oui' : cnt===1 ? 'non' : '';
-        cy.add({ group:'edges', data:{ id:'e'+(nextEdgeId++), source:origin.id(), target:target.id(), label:lbl }});
+        cy.add({
+          group:'edges',
+          data:{
+            id:'e'+nextEdgeId,
+            source:linkOrigin.id(),
+            target:linkTarget.id(),
+            label: lbl
+          }
+        });
+        nextEdgeId++;
+        cy.fit(null, 20);
+        cy.resize();
         saveState();
       }
-      linkStart = null;
+      linkOrigin = linkTarget = null;
+      didDrag = false;
     });
 
     // Inline editing

@@ -116,7 +116,7 @@
     </div>
   </div>
   <div class="bubble-floating" style="left:10%;width:80px;height:80px;animation-delay:1s"></div>
-  <div class="bubble-floating" style="left:30%;width:60px;height:60px;animation: delay 5sre;"></div>
+  <div class="bubble-floating" style="left:30%;width:60px;height:60px;animation-delay:5s;"></div>
   <div class="bubble-floating" style="left:50%;width:100px;height:100px;animation-delay:3s"></div>
   <div class="bubble-floating" style="left:70%;width:50px;height:50px;animation-delay:7s"></div>
   <div class="bubble-floating" style="left:90%;width:80px;height:80px;animation-delay:4s"></div>
@@ -175,7 +175,11 @@
       layout: { name: 'preset' }
     });
     const cyEl = document.getElementById('cy');
-    new ResizeObserver(() => cy.resize()).observe(cyEl);
+
+    if (window.ResizeObserver) {
+      new ResizeObserver(() => cy.resize()).observe(cyEl);
+    }
+
     requestAnimationFrame(() => { cy.resize(); cy.fit(null, 20); });
     window.addEventListener('resize', () => cy.resize());
     (function loadState(){
