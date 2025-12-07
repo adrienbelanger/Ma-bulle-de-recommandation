@@ -140,6 +140,39 @@
       document.body.classList.add('fade-out');
       document.body.addEventListener('animationend', () => window.location.href = url, { once: true });
     }
+
+    const STORAGE_KEY = 'studentDataV2';
+    function normalizeSample(s) {
+      if (!s) return null;
+      const title = (s.title || s.watched || '').trim();
+      const label = (s.label || s.category || '').trim();
+      if (!title || !label) return null;
+      return { title, label, source: s.source || 'page1', age: s.age || null };
+    }
+    function loadSamples() {
+      try {
+        const raw = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+        return Array.isArray(raw) ? raw.map(normalizeSample).filter(Boolean) : [];
+      } catch (e) { return []; }
+    }
+    function saveSamples(samples) {
+      const seen = new Set();
+      const cleaned = [];
+      (samples || []).forEach(s => {
+        const key = (s.title || '').toLowerCase() + '|' + (s.label || '').toLowerCase();
+        if (!key.trim() || seen.has(key)) return;
+        seen.add(key);
+        cleaned.push({ title: s.title, label: s.label, source: s.source || 'page1', age: s.age || null });
+      });
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(cleaned));
+    }
+    function mergeSamples(newOnes) {
+      const existing = loadSamples();
+      const merged = existing.concat((newOnes || []).map(normalizeSample).filter(Boolean));
+      saveSamples(merged);
+      return merged;
+    }
+
     const questions = [
   { age: 12, watched: 'Minecraft: Je vais battre le dragon!', category: 'Jeux', options: ['Je construit ma base secrète dans Minecraft', 'Un jour à Paris : vlog découverte', 'Je teste la recette du gâteau arc-en-ciel', 'Défi sport : 200 sauts à la corde'] },
   { age: 14, watched: 'Tutoriel sur la préparation de smoothies', category: 'Cuisine', options: ['Smoothie tropical ultra frais', 'Je teste 3 applis de productivité', 'Mon chat rencontre un chien pour la première fois', 'Top 5 des looks d’été pas chers'] },
@@ -158,14 +191,24 @@
     const optionsDiv = document.getElementById('options');
     const tbody = document.getElementById('dataset-body');
     const dataset = [];
-    localStorage.setItem('studentData', '[]');
+
+    // Pre-fill table with any existing samples from previous steps
+    loadSamples().filter(s => s.source === 'page1').forEach(s => {
+      const row = document.createElement('tr');
+      row.innerHTML = `<td>${s.age ?? '-'}</td><td>${s.title}</td><td>${s.label}</td><td>-</td>`;
+      tbody.appendChild(row);
+    });
+
+    function shuffle(arr){for(let i=arr.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[arr[i],arr[j]]=[arr[j],arr[i]]}return arr;}
+
     function renderQuestion() {
       const q = questions[current];
       questionText.classList.remove('fade'); void questionText.offsetWidth;
-      questionText.textContent = `Vous avez ${q.age} ans et venez de regarder « ${q.watched} ».`; 
+      questionText.textContent = `Vous avez ${q.age} ans et venez de regarder « ${q.watched} ».`;
       questionText.classList.add('fade');
       optionsDiv.innerHTML = '';
-      q.options.forEach(opt => {
+      const opts = shuffle([...q.options]);
+      opts.forEach(opt => {
         const btn = document.createElement('button'); btn.textContent = opt;
         btn.onclick = () => addPrediction(opt);
         optionsDiv.appendChild(btn);
@@ -173,18 +216,19 @@
     }
     function addPrediction(choice) {
       const q = questions[current];
-      const entry = { age: q.age, watched: q.watched, category: q.category, prediction: choice };
+      const entry = { age: q.age, watched: q.watched, category: q.category, prediction: choice, label: q.category, title: q.watched, source: 'page1' };
       dataset.push(entry);
-      localStorage.setItem('studentData', JSON.stringify(dataset));
       const row = document.createElement('tr');
       row.innerHTML = `<td>${q.age}</td><td>${q.watched}</td><td>${q.category}</td><td>${choice}</td>`;
       row.classList.add('row-fade-in');
       tbody.appendChild(row);
+      mergeSamples([entry]);
       current++;
       if (current < questions.length) setTimeout(renderQuestion,300);
       else {
         questionText.classList.remove('fade'); void questionText.offsetWidth;
         questionText.textContent = 'Fin des questions !';
+        optionsDiv.innerHTML = '';
       }
     }
     renderQuestion();

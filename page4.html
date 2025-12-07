@@ -47,7 +47,8 @@ function navigate(u){
  document.body.addEventListener('animationend',()=>location.href=u,{once:true})
 }
 function tokens(s){return s.toLowerCase().split(/[^a-zàâçéèêëîïôûùüÿñæœ]+/).filter(Boolean)}
-const trainData=[
+const STORAGE_KEY='studentDataV2';
+const BASE_SAMPLES=[
 {title:'Aventure au chalet des amis',label:'Dessins'},
 {title:'Moments drôles du castor bleu',label:'Dessins'},
 {title:'La course folle du lapin malin',label:'Dessins'},
@@ -154,40 +155,112 @@ const trainData=[
 {title:'Exploration d’un donjon gelé',label:'Jeux vidéo'}
 ];
 
-const testData=[
-{title:'Bataille de robots rétro',label:'Jeux vidéo'},
-{title:'Expérience œuf rebondissant',label:'Expériences'},
-{title:'Pourquoi avons-nous des saisons',label:'Sciences'},
-{title:'Premiers pas du koala',label:'Animaux'},
-{title:'Le train fantôme mais gentil',label:'Dessins'},
-{title:'Cristaux de sel en 24 heures',label:'Expériences'},
-{title:'Top 5 des meilleurs RPG fantastiques',label:'Jeux vidéo'},
-{title:'La carte au trésor de la cour d’école',label:'Dessins'},
-{title:'Comment les avions volent',label:'Sciences'},
-{title:'Guide des soins pour hamster débutant',label:'Animaux'}
-];
+function normalizeSample(s){
+  if(!s) return null;
+  const title=(s.title||s.watched||'').trim();
+  const label=(s.label||s.category||'').trim();
+  if(!title||!label) return null;
+  return {title,label,source:s.source||'unknown'};
+}
+function loadSamples(){
+  try{
+    const raw=JSON.parse(localStorage.getItem(STORAGE_KEY)||'[]');
+    const stored=Array.isArray(raw)?raw.map(normalizeSample).filter(Boolean):[];
+    return dedupeSamples(BASE_SAMPLES.concat(stored));
+  }catch(e){
+    return BASE_SAMPLES;
+  }
+}
+function dedupeSamples(arr){
+  const seen=new Set(); const out=[];
+  (arr||[]).forEach(s=>{
+    if(!s) return;
+    const key=s.title.toLowerCase()+'|'+s.label.toLowerCase();
+    if(seen.has(key)) return;
+    seen.add(key);
+    out.push({title:s.title,label:s.label,source:s.source||'unknown'});
+  });
+  return out;
+}
 
-const recVid={Dessins:'Aventure au chalet des amis',Expériences:'Réaction pâte à dents géante',Animaux:'Premiers pas du panda roux',Sciences:'Le système solaire expliqué','Jeux vidéo':'Construction d’un monde en blocs'}
-let vocab=[],word2idx={},centroids={},centroidNorm={}
-function buildVocab(){for(const r of trainData){for(const w of tokens(r.title)){if(word2idx[w]===undefined){word2idx[w]=vocab.length;vocab.push(w)}}}}
-function vecFromTitle(t){const v=new Uint8Array(vocab.length);for(const w of tokens(t)){const i=word2idx[w];if(i!==undefined)v[i]=1}return v}
-function cosine(a,b,nB){let dot=0,nA=0;for(let i=0;i<a.length;i++){if(a[i]){nA++;if(b[i])dot++}}if(nA===0||nB===0)return 0;return dot/Math.sqrt(nA*nB)}
-function trainModel(){buildVocab();const sums={},counts={};for(const r of trainData){const v=vecFromTitle(r.title);const lab=r.label;if(!sums[lab]){sums[lab]=new Float32Array(vocab.length);counts[lab]=0}for(let i=0;i<v.length;i++){sums[lab][i]+=v[i]}counts[lab]++}for(const lab in sums){for(let i=0;i<vocab.length;i++){sums[lab][i]/=counts[lab]}centroids[lab]=sums[lab];let n=0;for(let i=0;i<vocab.length;i++){if(centroids[lab][i]>0)n++}centroidNorm[lab]=Math.sqrt(n)}return counts}
-function predict(t){const v=vecFromTitle(t);let best=null,bestScore=-1;for(const lab in centroids){const s=cosine(v,centroids[lab],centroidNorm[lab]);if(s>bestScore){bestScore=s;best=lab}}return best}
+function trainNaiveBayes(samples){
+  const vocab=new Map();
+  const labelCounts={}, wordCounts={}, totalWords={};
+  samples.forEach(s=>{
+    const tokensArr=tokens(s.title);
+    labelCounts[s.label]=(labelCounts[s.label]||0)+1;
+    wordCounts[s.label]=wordCounts[s.label]||{};
+    totalWords[s.label]=totalWords[s.label]||0;
+    tokensArr.forEach(w=>{
+      vocab.set(w,(vocab.get(w)||0)+1);
+      wordCounts[s.label][w]=(wordCounts[s.label][w]||0)+1;
+      totalWords[s.label]++;
+    });
+  });
+  const labels=Object.keys(labelCounts);
+  const vocabSize=vocab.size||1;
+  const logPrior={}; const logLik={}; const unk={};
+  labels.forEach(l=>{
+    logPrior[l]=Math.log((labelCounts[l]||1)/samples.length);
+    logLik[l]={};
+    const denom=(totalWords[l]||0)+vocabSize;
+    unk[l]=Math.log(1/denom);
+    vocab.forEach((_,w)=>{
+      const num=(wordCounts[l][w]||0)+1;
+      logLik[l][w]=Math.log(num/denom);
+    });
+  });
+  return {labels,logPrior,logLik,unk,vocab:Array.from(vocab.keys())};
+}
+function predictWithModel(text,model){
+  if(!model||!model.labels.length) return null;
+  const toks=tokens(text);
+  let best=null,bestScore=-Infinity;
+  model.labels.forEach(l=>{
+    let s=model.logPrior[l];
+    toks.forEach(w=>{
+      s+= (model.logLik[l][w]!==undefined?model.logLik[l][w]:model.unk[l]);
+    });
+    if(s>bestScore){bestScore=s;best=l;}
+  });
+  return best;
+}
+
 document.getElementById('trainBtn').addEventListener('click',()=>{
- document.getElementById('trainBtn').disabled=true
- document.getElementById('status').textContent='Entraînement...'
- setTimeout(()=>{
-  trainModel()
-  document.getElementById('status').textContent='Génération des recommandations...'
-  let res='<h3>Suggestions après test</h3><table><tr><th>Titre visionné</th><th>Vidéo suggérée</th><th></th></tr>'
-  for(const r of testData){const cat=predict(r.title);const ok=cat===r.label?'✅':'❌';res+=`<tr><td>${r.title}</td><td>${recVid[cat]||'Aucune'}</td><td>${ok}</td></tr>`}
-  res+='</table>'
-  document.getElementById('results').innerHTML=res
-  document.getElementById('status').textContent='Terminé'
-  document.getElementById('trainBtn').disabled=false
- },800)
-})
+  const btn=document.getElementById('trainBtn');
+  const status=document.getElementById('status');
+  const results=document.getElementById('results');
+  btn.disabled=true;
+  status.textContent='Entraînement...';
+  setTimeout(()=>{
+    const samples=loadSamples();
+    if(!samples.length){
+      status.textContent='Aucune donnée pour entraîner.';
+      btn.disabled=false;
+      return;
+    }
+    const model=trainNaiveBayes(samples);
+    status.textContent='Évaluation rapide...';
+    let correct=0;
+    samples.forEach(s=>{
+      const pred=predictWithModel(s.title,model);
+      if(pred===s.label) correct++;
+    });
+    const acc=Math.round((correct/Math.max(samples.length,1))*100);
+    let res='<h3>Résultats</h3>';
+    res+=`<p>${samples.length} échantillons (page 1 + page 2 + base), précision entraînement: <strong>${acc}%</strong></p>`;
+    res+='<table><tr><th>Titre</th><th>Vérité</th><th>Prédiction</th></tr>';
+    samples.slice(0,12).forEach(s=>{
+      const pred=predictWithModel(s.title,model);
+      const ok=pred===s.label?'✅':'❌';
+      res+=`<tr><td>${s.title}</td><td>${s.label}</td><td>${pred||'?'} ${ok}</td></tr>`;
+    });
+    res+='</table>';
+    results.innerHTML=res;
+    status.textContent='Terminé';
+    btn.disabled=false;
+  },400);
+});
 </script>
 </body>
 </html>

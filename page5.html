@@ -142,10 +142,118 @@ function navigate(url){
   document.body.addEventListener('animationend',()=>location.href=url,{once:true});
 }
 
-// --- Graph state (rebuilt) ---
+// --- Shared data/model utilities ---
+const STORAGE_KEY = 'studentDataV2';
 const GRAPH_KEY = 'graphSessionV1';
 let isRestoring = false;
 let cy; // set on DOMContentLoaded
+
+const BASE_SAMPLES = [
+{title:'Aventure au chalet des amis',label:'Dessins'},
+{title:'Moments drôles du castor bleu',label:'Dessins'},
+{title:'La course folle du lapin malin',label:'Dessins'},
+{title:'La flaque de boue magique',label:'Dessins'},
+{title:'Le coureur et le coyote rigolo',label:'Dessins'},
+{title:'Blagues du duo farceur',label:'Dessins'},
+{title:'Sauvetage dans la forêt mystique',label:'Dessins'},
+{title:'Patrouille du port joyeux',label:'Dessins'},
+{title:'Fête de danse des chiots',label:'Dessins'},
+{title:'La montagne russe bricolée',label:'Dessins'},
+{title:'Le village en carton prend vie',label:'Dessins'},
+{title:'Le dragon qui éternue des confettis',label:'Dessins'},
+{title:'La fusée dessinée décolle pour de vrai',label:'Dessins'},
+{title:'Le carnaval des parapluies volants',label:'Dessins'},
+{title:'La carte au trésor de la cour d’école',label:'Dessins'},
+{title:'Le train fantôme mais gentil',label:'Dessins'},
+{title:'Le concours de grimaces intergalactique',label:'Dessins'},
+{title:'Le cirque des objets perdus',label:'Dessins'},
+{title:'Le pâtissier pingouin et ses gâteaux',label:'Dessins'},
+{title:'La cabane secrète au sommet du nuage',label:'Dessins'},
+
+{title:'Volcan maison avec vinaigre',label:'Expériences'},
+{title:'Fusée au bicarbonate de soude',label:'Expériences'},
+{title:'Réaction pâte à dents géante',label:'Expériences'},
+{title:'Fabriquer du slime étirable',label:'Expériences'},
+{title:'Lait qui change de couleur',label:'Expériences'},
+{title:'Oobleck étrange liquide-solide',label:'Expériences'},
+{title:'Voiture ballon propulsée',label:'Expériences'},
+{title:'Lampe lave DIY',label:'Expériences'},
+{title:'Pile citron maison',label:'Expériences'},
+{title:'Fontaine menthe et cola',label:'Expériences'},
+{title:'Arc-en-ciel en bocal',label:'Expériences'},
+{title:'Encre invisible au jus de citron',label:'Expériences'},
+{title:'Pont en spaghetti qui tient',label:'Expériences'},
+{title:'Bateau en aluminium qui ne coule pas',label:'Expériences'},
+{title:'Aimants et boussole maison',label:'Expériences'},
+{title:'Pluie en nuage de mousse à raser',label:'Expériences'},
+{title:'Paper rocket qui vole droit',label:'Expériences'},
+{title:'Œuf rebondissant sans coquille',label:'Expériences'},
+{title:'Cristaux de sel en 24 heures',label:'Expériences'},
+{title:'Tornade dans une bouteille',label:'Expériences'},
+
+{title:'Premiers pas du panda roux',label:'Animaux'},
+{title:'Safari rugissements du lion',label:'Animaux'},
+{title:'Chiens exécutent des tours',label:'Animaux'},
+{title:'Chatons jouent au laser',label:'Animaux'},
+{title:'Sauts spectaculaires des dauphins',label:'Animaux'},
+{title:'Danse des oiseaux tropicaux',label:'Animaux'},
+{title:'Vie secrète des fourmis',label:'Animaux'},
+{title:'Sauvetage d’un manchot',label:'Animaux'},
+{title:'Bain de boue de l’éléphant',label:'Animaux'},
+{title:'Grimpe du panda roux',label:'Animaux'},
+{title:'Comment brosser son chat sans stress',label:'Animaux'},
+{title:'Mon chien teste un parcours d’agilité',label:'Animaux'},
+{title:'Au refuge: histoires de chiens seniors',label:'Animaux'},
+{title:'Chevaux miniatures en promenade',label:'Animaux'},
+{title:'Caméra nichoir: naissance des mésanges',label:'Animaux'},
+{title:'Renard curieux près du chalet',label:'Animaux'},
+{title:'Grenouilles et têtards à l’étang',label:'Animaux'},
+{title:'Tortues marines libérées sur la plage',label:'Animaux'},
+{title:'Au bain: capybaras relax',label:'Animaux'},
+{title:'Guide des soins pour hamster débutant',label:'Animaux'},
+
+{title:'Le système solaire expliqué',label:'Sciences'},
+{title:'Pourquoi les plantes sont vertes',label:'Sciences'},
+{title:'Physique des montagnes russes',label:'Sciences'},
+{title:'Voyage dans le corps humain',label:'Sciences'},
+{title:'Construire un circuit simple',label:'Sciences'},
+{title:'Cycle de l’eau illustré',label:'Sciences'},
+{title:'Bases du magnétisme',label:'Sciences'},
+{title:'Les états de la matière',label:'Sciences'},
+{title:'Documentaire sur les dinosaures',label:'Sciences'},
+{title:'Introduction à l’électricité',label:'Sciences'},
+{title:'Pourquoi avons-nous des saisons',label:'Sciences'},
+{title:'Énergie renouvelable à la maison',label:'Sciences'},
+{title:'Comment les avions volent',label:'Sciences'},
+{title:'La force de gravité en exemples',label:'Sciences'},
+{title:'Microbes bons et mauvais',label:'Sciences'},
+{title:'Lumière et prisme arc-en-ciel',label:'Sciences'},
+{title:'Anatomie du cerveau simplifiée',label:'Sciences'},
+{title:'Tectonique des plaques animée',label:'Sciences'},
+{title:'Pourquoi le ciel est bleu',label:'Sciences'},
+{title:'Mesurer le temps sans montre',label:'Sciences'},
+
+{title:'Construction d’un monde en blocs',label:'Jeux vidéo'},
+{title:'Match de soccer virtuel',label:'Jeux vidéo'},
+{title:'Aventure RPG forêt enchantée',label:'Jeux vidéo'},
+{title:'Stratégie conquête médiévale',label:'Jeux vidéo'},
+{title:'Puzzle plateforme spatiale',label:'Jeux vidéo'},
+{title:'Course à obstacles néon',label:'Jeux vidéo'},
+{title:'Simulation ferme canadienne',label:'Jeux vidéo'},
+{title:'Course folle de kart arctique',label:'Jeux vidéo'},
+{title:'Défi danse rythmique arcade',label:'Jeux vidéo'},
+{title:'Guide débutant de l’île pixel',label:'Jeux vidéo'},
+{title:'Survie extrême : ma base secrète révélée',label:'Jeux vidéo'},
+{title:'Top 5 des meilleurs RPG fantastiques',label:'Jeux vidéo'},
+{title:'Jeu d’énigmes: salle secrète',label:'Jeux vidéo'},
+{title:'Boss final battu sans dégâts',label:'Jeux vidéo'},
+{title:'Construire une ferme automatique',label:'Jeux vidéo'},
+{title:'Vitesse: record sur piste urbaine',label:'Jeux vidéo'},
+{title:'Mode créatif: maison moderne',label:'Jeux vidéo'},
+{title:'Tournoi local: finale épique',label:'Jeux vidéo'},
+{title:'Astuces pour débuter en sandbox',label:'Jeux vidéo'},
+{title:'Exploration d’un donjon gelé',label:'Jeux vidéo'}
+];
 
 function cleanElement(ele) {
   if (!ele || !ele.group || !ele.data) return null;
@@ -269,6 +377,77 @@ function restoreGraphFromSnapshot(snapshotList) {
   });
 }
 
+function normalizeSample(s){
+  if(!s) return null;
+  const title=(s.title||s.watched||'').trim();
+  const label=(s.label||s.category||'').trim();
+  if(!title||!label) return null;
+  return {title,label,source:s.source||'unknown'};
+}
+function loadSamples(){
+  try{
+    const raw=JSON.parse(localStorage.getItem(STORAGE_KEY)||'[]');
+    const stored=Array.isArray(raw)?raw.map(normalizeSample).filter(Boolean):[];
+    return dedupeSamples(BASE_SAMPLES.concat(stored));
+  }catch(e){
+    return BASE_SAMPLES;
+  }
+}
+function dedupeSamples(arr){
+  const seen=new Set(); const out=[];
+  (arr||[]).forEach(s=>{
+    if(!s) return;
+    const key=s.title.toLowerCase()+'|'+s.label.toLowerCase();
+    if(seen.has(key)) return;
+    seen.add(key);
+    out.push({title:s.title,label:s.label,source:s.source||'unknown'});
+  });
+  return out;
+}
+
+function trainNaiveBayes(samples){
+  const vocab=new Map();
+  const labelCounts={}, wordCounts={}, totalWords={};
+  samples.forEach(s=>{
+    const tokensArr=tokens(s.title);
+    labelCounts[s.label]=(labelCounts[s.label]||0)+1;
+    wordCounts[s.label]=wordCounts[s.label]||{};
+    totalWords[s.label]=totalWords[s.label]||0;
+    tokensArr.forEach(w=>{
+      vocab.set(w,(vocab.get(w)||0)+1);
+      wordCounts[s.label][w]=(wordCounts[s.label][w]||0)+1;
+      totalWords[s.label]++;
+    });
+  });
+  const labels=Object.keys(labelCounts);
+  const vocabSize=vocab.size||1;
+  const logPrior={}; const logLik={}; const unk={};
+  labels.forEach(l=>{
+    logPrior[l]=Math.log((labelCounts[l]||1)/samples.length);
+    logLik[l]={};
+    const denom=(totalWords[l]||0)+vocabSize;
+    unk[l]=Math.log(1/denom);
+    vocab.forEach((_,w)=>{
+      const num=(wordCounts[l][w]||0)+1;
+      logLik[l][w]=Math.log(num/denom);
+    });
+  });
+  return {labels,logPrior,logLik,unk,vocab:Array.from(vocab.keys())};
+}
+function predictWithModel(text,model){
+  if(!model||!model.labels.length) return null;
+  const toks=tokens(text);
+  let best=null,bestScore=-Infinity;
+  model.labels.forEach(l=>{
+    let s=model.logPrior[l];
+    toks.forEach(w=>{
+      s+= (model.logLik[l][w]!==undefined?model.logLik[l][w]:model.unk[l]);
+    });
+    if(s>bestScore){bestScore=s;best=l;}
+  });
+  return best;
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   cy = cytoscape({
     container: document.getElementById('cy'),
@@ -321,113 +500,6 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 function tokens(s){return s.toLowerCase().split(/[^a-zàâçéèêëîïôûùüÿñæœ0-9]+/).filter(Boolean)}
-const trainData=[
-{title:'Aventure au chalet des amis',label:'Dessins'},
-{title:'Moments drôles du castor bleu',label:'Dessins'},
-{title:'La course folle du lapin malin',label:'Dessins'},
-{title:'La flaque de boue magique',label:'Dessins'},
-{title:'Le coureur et le coyote rigolo',label:'Dessins'},
-{title:'Blagues du duo farceur',label:'Dessins'},
-{title:'Sauvetage dans la forêt mystique',label:'Dessins'},
-{title:'Patrouille du port joyeux',label:'Dessins'},
-{title:'Fête de danse des chiots',label:'Dessins'},
-{title:'La montagne russe bricolée',label:'Dessins'},
-{title:'Le village en carton prend vie',label:'Dessins'},
-{title:'Le dragon qui éternue des confettis',label:'Dessins'},
-{title:'La fusée dessinée décolle pour de vrai',label:'Dessins'},
-{title:'Le carnaval des parapluies volants',label:'Dessins'},
-{title:'La carte au trésor de la cour d’école',label:'Dessins'},
-{title:'Le train fantôme mais gentil',label:'Dessins'},
-{title:'Le concours de grimaces intergalactique',label:'Dessins'},
-{title:'Le cirque des objets perdus',label:'Dessins'},
-{title:'Le pâtissier pingouin et ses gâteaux',label:'Dessins'},
-{title:'La cabane secrète au sommet du nuage',label:'Dessins'},
-
-{title:'Volcan maison avec vinaigre',label:'Expériences'},
-{title:'Fusée au bicarbonate de soude',label:'Expériences'},
-{title:'Réaction pâte à dents géante',label:'Expériences'},
-{title:'Fabriquer du slime étirable',label:'Expériences'},
-{title:'Lait qui change de couleur',label:'Expériences'},
-{title:'Oobleck étrange liquide-solide',label:'Expériences'},
-{title:'Voiture ballon propulsée',label:'Expériences'},
-{title:'Lampe lave DIY',label:'Expériences'},
-{title:'Pile citron maison',label:'Expériences'},
-{title:'Fontaine menthe et cola',label:'Expériences'},
-{title:'Arc-en-ciel en bocal',label:'Expériences'},
-{title:'Encre invisible au jus de citron',label:'Expériences'},
-{title:'Pont en spaghetti qui tient',label:'Expériences'},
-{title:'Bateau en aluminium qui ne coule pas',label:'Expériences'},
-{title:'Aimants et boussole maison',label:'Expériences'},
-{title:'Pluie en nuage de mousse à raser',label:'Expériences'},
-{title:'Paper rocket qui vole droit',label:'Expériences'},
-{title:'Œuf rebondissant sans coquille',label:'Expériences'},
-{title:'Cristaux de sel en 24 heures',label:'Expériences'},
-{title:'Tornade dans une bouteille',label:'Expériences'},
-
-{title:'Premiers pas du panda roux',label:'Animaux'},
-{title:'Safari rugissements du lion',label:'Animaux'},
-{title:'Chiens exécutent des tours',label:'Animaux'},
-{title:'Chatons jouent au laser',label:'Animaux'},
-{title:'Sauts spectaculaires des dauphins',label:'Animaux'},
-{title:'Danse des oiseaux tropicaux',label:'Animaux'},
-{title:'Vie secrète des fourmis',label:'Animaux'},
-{title:'Sauvetage d’un manchot',label:'Animaux'},
-{title:'Bain de boue de l’éléphant',label:'Animaux'},
-{title:'Grimpe du panda roux',label:'Animaux'},
-{title:'Comment brosser son chat sans stress',label:'Animaux'},
-{title:'Mon chien teste un parcours d’agilité',label:'Animaux'},
-{title:'Au refuge: histoires de chiens seniors',label:'Animaux'},
-{title:'Chevaux miniatures en promenade',label:'Animaux'},
-{title:'Caméra nichoir: naissance des mésanges',label:'Animaux'},
-{title:'Renard curieux près du chalet',label:'Animaux'},
-{title:'Grenouilles et têtards à l’étang',label:'Animaux'},
-{title:'Tortues marines libérées sur la plage',label:'Animaux'},
-{title:'Au bain: capybaras relax',label:'Animaux'},
-{title:'Guide des soins pour hamster débutant',label:'Animaux'},
-
-{title:'Le système solaire expliqué',label:'Sciences'},
-{title:'Pourquoi les plantes sont vertes',label:'Sciences'},
-{title:'Physique des montagnes russes',label:'Sciences'},
-{title:'Voyage dans le corps humain',label:'Sciences'},
-{title:'Construire un circuit simple',label:'Sciences'},
-{title:'Cycle de l’eau illustré',label:'Sciences'},
-{title:'Bases du magnétisme',label:'Sciences'},
-{title:'Les états de la matière',label:'Sciences'},
-{title:'Documentaire sur les dinosaures',label:'Sciences'},
-{title:'Introduction à l’électricité',label:'Sciences'},
-{title:'Pourquoi avons-nous des saisons',label:'Sciences'},
-{title:'Énergie renouvelable à la maison',label:'Sciences'},
-{title:'Comment les avions volent',label:'Sciences'},
-{title:'La force de gravité en exemples',label:'Sciences'},
-{title:'Microbes bons et mauvais',label:'Sciences'},
-{title:'Lumière et prisme arc-en-ciel',label:'Sciences'},
-{title:'Anatomie du cerveau simplifiée',label:'Sciences'},
-{title:'Tectonique des plaques animée',label:'Sciences'},
-{title:'Pourquoi le ciel est bleu',label:'Sciences'},
-{title:'Mesurer le temps sans montre',label:'Sciences'},
-
-{title:'Construction d’un monde en blocs',label:'Jeux vidéo'},
-{title:'Match de soccer virtuel',label:'Jeux vidéo'},
-{title:'Aventure RPG forêt enchantée',label:'Jeux vidéo'},
-{title:'Stratégie conquête médiévale',label:'Jeux vidéo'},
-{title:'Puzzle plateforme spatiale',label:'Jeux vidéo'},
-{title:'Course à obstacles néon',label:'Jeux vidéo'},
-{title:'Simulation ferme canadienne',label:'Jeux vidéo'},
-{title:'Course folle de kart arctique',label:'Jeux vidéo'},
-{title:'Défi danse rythmique arcade',label:'Jeux vidéo'},
-{title:'Guide débutant de l’île pixel',label:'Jeux vidéo'},
-{title:'Survie extrême : ma base secrète révélée',label:'Jeux vidéo'},
-{title:'Top 5 des meilleurs RPG fantastiques',label:'Jeux vidéo'},
-{title:'Jeu d’énigmes: salle secrète',label:'Jeux vidéo'},
-{title:'Boss final battu sans dégâts',label:'Jeux vidéo'},
-{title:'Construire une ferme automatique',label:'Jeux vidéo'},
-{title:'Vitesse: record sur piste urbaine',label:'Jeux vidéo'},
-{title:'Mode créatif: maison moderne',label:'Jeux vidéo'},
-{title:'Tournoi local: finale épique',label:'Jeux vidéo'},
-{title:'Astuces pour débuter en sandbox',label:'Jeux vidéo'},
-{title:'Exploration d’un donjon gelé',label:'Jeux vidéo'}
-];
-
 const defaultTestData=[
 {title:'Bataille de robots rétro',label:'Jeux vidéo'},
 {title:'Expérience œuf rebondissant',label:'Expériences'},
@@ -441,31 +513,25 @@ const defaultTestData=[
 {title:'Guide des soins pour hamster débutant',label:'Animaux'}
 ];
 
-const recVid={Dessins:'Aventure au chalet des amis',Expériences:'Réaction pâte à dents géante',Animaux:'Premiers pas du panda roux',Sciences:'Le système solaire expliqué','Jeux vidéo':'Construction d’un monde en blocs'};
-
-const testData=(()=>{
-  try{
-    const raw=JSON.parse(localStorage.getItem('studentData')||'[]');
-    if(Array.isArray(raw)&&raw.length){
-      const catMap={Jeux:'Jeux vidéo',Cuisine:'Expériences',Sport:'Sciences',Mode:'Dessins',Animaux:'Animaux',Vlog:'Dessins'};
-      const mapped=raw.map(r=>({title:r.prediction||r.title||'',label:catMap[r.category]||r.category})).filter(r=>recVid[r.label]&&r.title);
-      if(mapped.length) return mapped;
-    }
-  }catch(e){}
+function buildRecVideos(samples){
+  const out={};
+  samples.forEach(s=>{ if(!out[s.label]) out[s.label]=s.title; });
+  return out;
+}
+function buildTestData(samples){
+  if(samples.length) return samples.slice(0, Math.min(samples.length, 12));
   return defaultTestData;
-})();
+}
 
-let vocab=[],word2idx={},centroids={},centroidNorm={};
-function buildVocab(){for(const r of trainData){for(const w of tokens(r.title)){if(word2idx[w]===undefined){word2idx[w]=vocab.length;vocab.push(w)}}}}
-function vecFromTitle(t){const v=new Uint8Array(vocab.length);for(const w of tokens(t)){const i=word2idx[w];if(i!==undefined)v[i]=1}return v}
-function cosine(a,b,nB){let dot=0,nA=0;for(let i=0;i<a.length;i++){if(a[i]){nA++;if(b[i])dot++}}if(nA===0||nB===0)return 0;return dot/Math.sqrt(nA*nB)}
-function trainModel(){vocab=[];word2idx={};centroids={};centroidNorm={};buildVocab();const sums={},counts={};for(const r of trainData){const v=vecFromTitle(r.title);const lab=r.label;if(!sums[lab]){sums[lab]=new Float32Array(vocab.length);counts[lab]=0}for(let i=0;i<v.length;i++){sums[lab][i]+=v[i]}counts[lab]++}for(const lab in sums){for(let i=0;i<vocab.length;i++){sums[lab][i]/=counts[lab]}centroids[lab]=sums[lab];let n=0;for(let i=0;i<vocab.length;i++){if(centroids[lab][i]>0)n++}centroidNorm[lab]=Math.sqrt(n)}}
-function ensureTrained(){if(!Object.keys(centroids).length){trainModel()}}
-function predict(t){ensureTrained();const v=vecFromTitle(t);let best=null,bestScore=-1;for(const lab in centroids){const s=cosine(v,centroids[lab],centroidNorm[lab]);if(s>bestScore){bestScore=s;best=lab}}return best||Object.keys(recVid)[0]}
+let allSamples = loadSamples();
+let recVid = buildRecVideos(allSamples);
+let model = trainNaiveBayes(allSamples);
+let testData = buildTestData(allSamples);
+let categories = Object.keys(recVid);
 
 let modelCorrect=0,userCorrect=0,currentTest=0;
 
-function initAndStart(){ensureTrained();showTest()}
+function initAndStart(){showTest()}
 if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded',initAndStart)}else{initAndStart()}
 
 function showTest(){
@@ -476,7 +542,7 @@ function showTest(){
   }
   const t=testData[currentTest];
   document.getElementById('current-title').textContent=`Visionné : ${t.title}`;
-  const robotCat=predict(t.title);
+  const robotCat=predictWithModel(t.title, model) || categories[0];
   const robotVid=recVid[robotCat]||'(aucune)';
   document.getElementById('model-pred').innerHTML=`Le robot a choisi : <strong>${robotVid}</strong>`;
   if(robotCat===t.label){modelCorrect++;document.getElementById('model-correct').textContent=modelCorrect}
@@ -499,7 +565,7 @@ function generateFeatures(){
 function renderOptions(robotCat){
   const t=testData[currentTest];
   const correctCat=t.label;
-  const cats=Object.keys(recVid);
+  const cats=categories;
   const optionCats=[correctCat];
   if(robotCat!==correctCat)optionCats.push(robotCat);
   const remaining=cats.filter(c=>!optionCats.includes(c));
@@ -517,8 +583,6 @@ function renderOptions(robotCat){
     grid.appendChild(card);
     currentOptions.push({cat,el:card});
   });
-  const match=currentOptions.find(o=>o.cat===robotCat);
-  if(match)match.el.classList.add('selected');
 }
 
 function choose(cat){
