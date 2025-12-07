@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <title>Créateur d'Arbre de Décision</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <style>
+    html, body { margin: 0; padding: 0; height: 100%; font-family: Arial, sans-serif; }
+    #toolbar {
+      position: fixed; top: 0; left: 0; right: 0;
+      height: 56px;
+      background: #f4f4f4;
+      border-bottom: 1px solid #ccc;
+      display: flex; align-items: center; padding: 0 16px;
+      box-sizing: border-box; z-index: 1000;
+    }
+    #toolbar .shape-btn {
+      width: 50px; height: 30px;
+      border: none; margin-right: 12px;
+      background: none; cursor: pointer;
+    }
+    #toolbar .decision-shape { background: #4CAF50; clip-path: polygon(50% 0%,100% 50%,50% 100%,0% 50%); }
+    #toolbar .leaf-shape     { background: #2196F3; border-radius: 8px; }
+    #toolbar button {
+      background: #cecece; border: none; color: #000;
+      font-size: 1rem; padding: 8px 12px; border-radius: 4px;
+      cursor: pointer;
+    }
+    #toolbar button:hover { background: #484848; color: #fff; }
+    .toolbar-right {
+      margin-left: auto; display: flex; gap: 12px; align-items: center;
+    }
+    #help {
+      display: flex; align-items: center; justify-content: center;
+      background: #cecece; border-radius: 4px;
+      padding: 8px; cursor: pointer;
+    }
+    #help:hover { background: #484848; }
+    #help svg { width: 24px; height: 24px; fill: #000; }
+    #cy {
+      margin-top: 56px;
+      width: 100%; height: calc(100vh - 56px);
+      position: relative;
+    }
+    #trash {
+      position: fixed; bottom: 20px; right: 20px;
+      width: 50px; height: 50px;
+      background: url('https://img.icons8.com/ios-filled/50/000000/trash.png') no-repeat center;
+      background-size: contain; opacity: 0.6;
+      transition: opacity 0.2s; z-index: 9999;
+    }
+    #trash.hovered { opacity: 1; filter: drop-shadow(0 0 5px red); }
+    #labelEditor {
+      position: absolute; display: none; z-index: 10000;
+      border: 1px solid #aaa; padding: 4px; font-size: 14px;
+      border-radius: 4px; box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+      background: #fff;
+    }
+    #helpBox {
+      position: absolute; top: 56px; right: 16px;
+      width: 240px; background: #fff;
+      border: 1px solid #ccc; padding: 8px;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+      display: none; z-index: 1001; font-size: 14px;
+    }
+  </style>
+  <script src="https://unpkg.com/cytoscape@3.32.1/dist/cytoscape.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/lz-string@1.4.4/libs/lz-string.min.js"></script>
+</head>
+<body>
+  <div id="toolbar">
+    <div class="shape-btn decision-shape" title="Ajouter un nœud de décision" id="addDecision"></div>
+    <div class="shape-btn leaf-shape"    title="Ajouter un nœud résultat"   id="addLeaf"></div>
+    <div class="toolbar-right">
+      <button id="catToolBtn">Outil de Catégorisation</button>
+      <div id="help" title="Afficher l'aide">
+        <svg viewBox="0 0 24 24">
+          <circle cx="12" cy="12" r="10" stroke="#000" fill="none" stroke-width="2"/>
+          <text x="12" y="16" text-anchor="middle" font-size="16" fill="#000">?</text>
+        </svg>
+      </div>
+    </div>
+  </div>
+
+  <div id="cy"></div>
+  <input id="labelEditor" type="text" />
+  <div id="trash" title="Glissez ici pour supprimer"></div>
+  <div id="helpBox">
+    <strong>Contrôles :</strong>
+    <ul style="padding-left:16px; margin:4px 0;">
+      <li>Clique sur le losange pour ajouter un noeud de décision</li>
+      <li>Clique sur le rectangle pour ajouter un noeud résultat</li>
+      <li>Clic droit + glisser pour lier deux noeuds</li>
+      <li>Double-clic pour renommer noeuds et arêtes</li>
+      <li>Glisse un noeud sur la poubelle pour supprimer</li>
+    </ul>
+  </div>
+</div>
+  </div>
+
+  <div id="cy"></div>
+  <input id="labelEditor" type="text" />
+  <div id="trash" title="Glissez ici pour supprimer"></div>
+
+  <script>
+  document.addEventListener('DOMContentLoaded', () => {
+    const cy = cytoscape({
+      container: document.getElementById('cy'),
+      elements: [],
+      style: [
+        { selector: 'node', style: {
+            'label':'data(label)',
+            'text-valign':'center','text-halign':'center',
+            'color':'#fff','width':'label','height':50,
+            'background-color':'#666'
+          }
+        },
+        { selector: '.decision', style: {
+            'shape':'diamond','background-color':'#4CAF50',
+            'padding':'30px'
+          }
+        },
+        { selector: '.leaf', style: {
+            'shape':'roundrectangle','background-color':'#2196F3',
+            'padding':'10px'
+          }
+        },
+        { selector: 'edge', style: {
+            'width':2,'line-color':'#000',
+            'target-arrow-shape':'triangle','target-arrow-color':'#000',
+            'arrow-scale':1.2,'curve-style':'bezier',
+            'target-distance-from-node':0,
+            'label':'data(label)','text-margin-x':0,'text-margin-y':-10,
+            'text-background-opacity':1,'text-background-color':'#fff',
+            'text-background-shape':'roundrectangle','text-background-padding':2,
+            'font-size':12,'text-rotation':'autorotate'
+          }
+        }
+      ],
+      layout:{ name:'preset' }
+    });
+
+    cy.container().addEventListener('contextmenu', e => e.preventDefault());
+
+    // --- History via URL hash + popstate ---
+function updateURL(arr) {
+  const json = JSON.stringify(arr);
+  const comp = LZString.compressToEncodedURIComponent(json);
+  history.pushState(null, '', '#' + comp);
+}
+
+
+
+function loadFromURL() {
+  const hash = location.hash.slice(1);
+  console.log('loadFromURL(): raw hash =', hash);
+  if (!hash) return null;
+
+  let snap = null;
+  try {
+    const json = LZString.decompressFromEncodedURIComponent(hash);
+    snap = JSON.parse(json);
+    console.log('loadFromURL(): parsed snapshot:', snap);
+  } catch (err) {
+    console.error('loadFromURL(): failed to parse:', err);
+    return null;
+  }
+  return snap;
+}
+
+
+function restoreGraph(snap) {
+  console.group('🔧 restoreGraph debug');
+  // 1) Clear out old elements
+  cy.elements().remove();
+  console.log('→ After remove: nodes=', cy.nodes().length, 'edges=', cy.edges().length);
+
+  if (!Array.isArray(snap) || !snap.length) {
+    console.warn('→ Empty or invalid snapshot; nothing to add');
+    nextNodeId = nextEdgeId = 0;
+    console.groupEnd();
+    return;
+  }
+
+  // 2) Split & clean (reuse your minimal logic)
+  const clean = ele => {
+    const out = { group: ele.group, data: { ...ele.data } };
+    if (ele.group === 'nodes' && ele.position) out.position = { ...ele.position };
+    if (ele.classes) out.classes = ele.classes;
+    return out;
+  };
+  const nodes = snap.filter(e => e.group === 'nodes').map(clean);
+  const edges = snap.filter(e => e.group === 'edges').map(clean);
+  console.log(`→ Will add ${nodes.length} nodes and ${edges.length} edges`);
+
+  // 3) Add nodes & log exactly what Cytoscape accepted
+  cy.add(nodes);
+  console.log('→ cy.add(nodes) →', cy.nodes().map(n => ({
+    id: n.id(),
+    label: n.data('label'),
+    cls: n.classes(),
+    renderedPosition: n.renderedPosition(),
+    boundingBox: n.boundingBox(),
+    visible: n.visible(),
+    shape: n.style('shape')
+  })));
+
+  // 4) Add edges & log exactly what Cytoscape accepted
+  cy.add(edges);
+  console.log('→ cy.add(edges) →', cy.edges().map(e => ({
+    id: e.id(),
+    source: e.source().id(),
+    target: e.target().id(),
+    label: e.data('label'),
+    visible: e.visible()
+  })));
+
+  // 5) Show overall bounding box vs container size
+  const bb = cy.elements().boundingBox();
+  const cr = cy.container().getBoundingClientRect();
+  console.log('→ Combined boundingBox:', bb);
+  console.log('→ Container rect:', cr);
+
+  // 6) Re-sync your counters
+  const nIds = cy.nodes().map(n => +n.id().slice(1)).filter(x => !isNaN(x));
+  const eIds = cy.edges().map(e => +e.id().slice(1)).filter(x => !isNaN(x));
+  nextNodeId = nIds.length ? Math.max(...nIds) + 1 : 0;
+  nextEdgeId = eIds.length ? Math.max(...eIds) + 1 : 0;
+  console.log('→ nextNodeId=', nextNodeId, 'nextEdgeId=', nextEdgeId);
+  console.groupEnd();
+}
+
+
+
+
+
+window.addEventListener('popstate', () => {
+  const snap = loadFromURL();
+  console.log('popstate → snapshot =', snap);
+  restoreGraph(snap);
+});
+
+    // --- Counters & saveState ---
+    let nextNodeId = 0, nextEdgeId = 0;
+function saveState() {
+  function clean(ele) {
+    const out = {
+      group: ele.group,
+      data: { ...ele.data }
+    };
+    if (ele.group === 'nodes' && ele.position)
+      out.position = { ...ele.position };
+    if (ele.classes && ele.classes.length)
+      out.classes = ele.classes;
+    return out;
+  }
+
+  const snap = cy.elements().jsons().map(clean);
+  updateURL(snap);
+}
+
+
+
+
+
+    // Initial load
+    const initial = loadFromURL();
+    if (initial) {
+      restoreGraph(initial);
+    } else {
+      saveState(); // create first history entry
+    }
+
+    // --- Node creation ---
+    function addNode(type) {
+      cy.add({
+        group:'nodes',
+        data:{ id:'n'+nextNodeId, label: type==='decision'?'Décision':'Résultat' },
+        classes:type,
+        position:{ x:100+Math.random()*400, y:100+Math.random()*300 }
+      });
+      nextNodeId++;
+      saveState();
+    }
+    document.getElementById('addDecision').onclick = () => addNode('decision');
+    document.getElementById('addLeaf').onclick     = () => addNode('leaf');
+
+    // --- SVG preview line (unchanged) ---
+    const svgNS = "http://www.w3.org/2000/svg";
+    const svg = document.createElementNS(svgNS, 'svg');
+    svg.setAttribute('style',
+      'position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:10'
+    );
+    const defs = document.createElementNS(svgNS, 'defs');
+    const marker = document.createElementNS(svgNS, 'marker');
+    marker.setAttribute('id','arrowHead');
+    marker.setAttribute('markerWidth','6');
+    marker.setAttribute('markerHeight','6');
+    marker.setAttribute('refX','0');
+    marker.setAttribute('refY','3');
+    marker.setAttribute('orient','auto');
+    const path = document.createElementNS(svgNS,'path');
+    path.setAttribute('d','M0,0 L0,6 L6,3 z');
+    path.setAttribute('fill','#000');
+    marker.appendChild(path);
+    defs.appendChild(marker);
+    svg.appendChild(defs);
+    const line = document.createElementNS(svgNS,'line');
+    line.setAttribute('id','previewLine');
+    line.setAttribute('stroke','#000');
+    line.setAttribute('stroke-width','2');
+    line.setAttribute('marker-end','url(#arrowHead)');
+    line.setAttribute('visibility','hidden');
+    svg.appendChild(line);
+    cy.container().appendChild(svg);
+
+    // --- Linking logic (right‐drag) ---
+    let linkOrigin = null, linkTarget = null, didDrag = false;
+    cy.on('cxttapstart','node', evt => {
+      linkOrigin = evt.target; didDrag = false; linkTarget = null;
+      const p = linkOrigin.renderedPosition();
+      line.setAttribute('x1',p.x);
+      line.setAttribute('y1',p.y);
+      line.setAttribute('x2',p.x);
+      line.setAttribute('y2',p.y);
+      line.setAttribute('visibility','visible');
+    });
+    cy.on('cxtdrag', evt => {
+      if (!linkOrigin) return;
+      didDrag = true;
+      const rp = evt.renderedPosition;
+      line.setAttribute('x2',rp.x);
+      line.setAttribute('y2',rp.y);
+    });
+    cy.on('cxtdragover','node', evt => {
+      if (didDrag && evt.target.id()!==linkOrigin.id()) {
+        linkTarget = evt.target;
+      }
+    });
+    cy.on('cxtdragout','node', evt => {
+      if (linkTarget && evt.target.id()===linkTarget.id()) {
+        linkTarget = null;
+      }
+    });
+    cy.on('cxttapend', () => {
+      line.setAttribute('visibility','hidden');
+      if (didDrag && linkOrigin && linkTarget &&
+          linkOrigin.id()!==linkTarget.id()) {
+
+        const cnt = cy.edges()
+          .filter(e => e.source().id()===linkOrigin.id())
+          .length;
+        const lbl = cnt===0 ? 'oui' : cnt===1 ? 'non' : '';
+
+        cy.add({
+          group:'edges',
+          data:{
+            id:'e'+nextEdgeId,
+            source:linkOrigin.id(),
+            target:linkTarget.id(),
+            label: lbl
+          }
+        });
+        nextEdgeId++;
+        saveState();
+      }
+      linkOrigin = linkTarget = null;
+      didDrag = false;
+    });
+
+    // --- Inline renaming (double‐tap) ---
+    cy.on('dbltap','node', evt => {
+      const n = evt.target, pos = n.renderedPosition();
+      showLabelEditor(n, pos, n.data('label'));
+    });
+    cy.on('dbltap','edge', evt => {
+      const e = evt.target;
+      const mid = e.midpoint(),
+            z   = cy.zoom(),
+            pan = cy.pan(),
+            r   = { x:mid.x*z+pan.x, y:mid.y*z+pan.y };
+      showLabelEditor(e, r, e.data('label')||'');
+    });
+
+    // --- Trash logic ---
+    const trash = document.getElementById('trash');
+    let draggedNode = null;
+    cy.on('grab','node', evt => { draggedNode = evt.target; });
+    cy.on('drag', evt => {
+      if (!draggedNode) return;
+      const rect = trash.getBoundingClientRect(),
+            pos  = evt.renderedPosition,
+            cr   = cy.container().getBoundingClientRect(),
+            ax   = cr.left + pos.x,
+            ay   = cr.top  + pos.y;
+      trash.classList[
+        ax>=rect.left && ax<=rect.right && ay>=rect.top && ay<=rect.bottom
+        ? 'add' : 'remove'
+      ]('hovered');
+    });
+    cy.on('free','node', evt => {
+      if (!draggedNode) return;
+      const rect = trash.getBoundingClientRect(),
+            pos  = evt.renderedPosition,
+            cr   = cy.container().getBoundingClientRect(),
+            ax   = cr.left + pos.x,
+            ay   = cr.top  + pos.y;
+      if (ax>=rect.left && ax<=rect.right && ay>=rect.top && ay<=rect.bottom) {
+        draggedNode.connectedEdges().remove();
+        draggedNode.remove();
+      } else {
+        saveState();
+      }
+      trash.classList.remove('hovered');
+      draggedNode = null;
+    });
+
+    // --- Label editor widget ---
+    const labelEditor = document.getElementById('labelEditor');
+    let editingEle = null;
+    function showLabelEditor(ele, pos, txt) {
+      editingEle = ele;
+      labelEditor.value = txt||'';
+      labelEditor.style.left = pos.x + 'px';
+      labelEditor.style.top  = pos.y + 'px';
+      labelEditor.style.display = 'block';
+      labelEditor.focus();
+      labelEditor.select();
+    }
+    labelEditor.addEventListener('keydown', e => {
+      if (e.key==='Enter') commitEdit();
+      else if (e.key==='Escape') cancelEdit();
+    });
+    labelEditor.addEventListener('blur', commitEdit);
+    function commitEdit() {
+      if (editingEle && labelEditor.value.trim()) {
+        editingEle.data('label', labelEditor.value.trim());
+        saveState();
+      }
+      labelEditor.style.display = 'none';
+      editingEle = null;
+    }
+    function cancelEdit() {
+      labelEditor.style.display = 'none';
+      editingEle = null;
+    }
+
+document.getElementById('catToolBtn')
+        .addEventListener('click', () => location.href = 'triage.html');
+
+
+    document.getElementById('help').addEventListener('click', function() {
+const helpBtn = document.getElementById('help');
+const helpBox = document.getElementById('helpBox');
+
+// Toggle help box on “?” click
+helpBtn.addEventListener('click', e => {
+  e.stopPropagation();
+  helpBox.style.display = helpBox.style.display === 'block' ? 'none' : 'block';
+});
+
+// Prevent clicks inside the box from closing it
+helpBox.addEventListener('click', e => e.stopPropagation());
+
+
+
+// Hide box on any outside click
+document.addEventListener('click', () => {
+  helpBox.style.display = 'none';
+});
+
+});
+  });
+  </script>
+</body>
+</html>

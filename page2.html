@@ -107,8 +107,7 @@
   <script>
     function navigate(url) {
       document.body.classList.add('fade-out');
-      const dest = url + location.hash;
-      document.body.addEventListener('animationend', () => window.location.href = dest, { once: true });
+      document.body.addEventListener('animationend', () => window.location.href = url, { once: true });
     }
     function removeRow(btn) {
       const row = btn.closest('tr');

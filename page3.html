@@ -139,14 +139,156 @@
   <div class="bubble-floating" style="left:70%; width:50px; height:50px; animation-delay:7s;"></div>
   <div class="bubble-floating" style="left:90%; width:80px; height:80px; animation-delay:4s;"></div>
 
-  <script>
+<script>
+    const LOG = (...args) => { try { console.log('[page3]', ...args); } catch (_) {} };
     function navigate(url) {
+      LOG('navigate', url);
       saveState();
       document.body.classList.add('fade-out');
-      const dest = url + location.hash;
-      document.body.addEventListener('animationend', () => window.location.href = dest, { once: true });
+      document.body.addEventListener('animationend', () => window.location.href = url, { once: true });
     }
 
+    // --- Graph state (session only, no URL) ---
+    const GRAPH_KEY = 'graphSessionV1';
+    let isRestoring = false;
+    let nextNodeId = 0, nextEdgeId = 0;
+
+    // Keep only the fields Cytoscape needs and normalize classes/positions
+    function cleanElement(ele) {
+      if (!ele || !ele.group || !ele.data) return null;
+      const base = { group: ele.group, data: { ...ele.data } };
+      const cls = ele.classes || ele.data.classes;
+      if (cls && String(cls).trim()) {
+        base.classes = Array.isArray(cls) ? cls.join(' ') : String(cls);
+      }
+      if (ele.group === 'nodes') {
+        const pos = ele.position;
+        if (pos && Number.isFinite(pos.x) && Number.isFinite(pos.y)) {
+          base.position = { x: Number(pos.x), y: Number(pos.y) };
+        }
+      }
+      return base;
+    }
+
+    // Accept either a raw array or a {nodes,edges} shape (old snapshots)
+    function normalizeSnapshotShape(raw) {
+      if (!raw) return [];
+      if (Array.isArray(raw)) return raw;
+      if (raw.nodes || raw.edges) {
+        return [...(raw.nodes || []), ...(raw.edges || [])];
+      }
+      return [];
+    }
+
+    function readSnapshot() {
+      const raw = sessionStorage.getItem(GRAPH_KEY);
+      LOG('readSnapshot raw exists', !!raw);
+      if (!raw) return [];
+
+      const tryParse = txt => normalizeSnapshotShape(JSON.parse(txt));
+
+      try {
+        const parsed = tryParse(raw);
+        if (parsed.length) return parsed;
+      } catch (e) { LOG('readSnapshot json fail', e); }
+
+      try {
+        const txt = LZString.decompressFromEncodedURIComponent(raw);
+        if (txt) {
+          const parsed = tryParse(txt);
+          if (parsed.length) return parsed;
+        }
+      } catch (e) { LOG('readSnapshot lz fail', e); }
+
+      return [];
+    }
+
+    function prepareElements(list) {
+      const cleaned = list.map(cleanElement).filter(Boolean);
+      const nodes = [];
+      const edges = [];
+      const nodeIds = new Set();
+
+      // Simple grid fallback when positions are missing
+      let col = 0, row = 0;
+      const stepX = 240, stepY = 140, startX = 140, startY = 160, maxCols = 3;
+
+      cleaned.forEach(ele => {
+        if (ele.group !== 'nodes') return;
+        const id = String(ele.data.id || ele.data.name || 'n' + nodes.length);
+        if (nodeIds.has(id)) return;
+        const node = { ...ele, data: { ...ele.data, id } };
+        if (!node.position) {
+          node.position = { x: startX + col * stepX, y: startY + row * stepY };
+          col = (col + 1) % maxCols;
+          if (col === 0) row++;
+        }
+        nodeIds.add(id);
+        nodes.push(node);
+      });
+
+      cleaned.forEach(ele => {
+        if (ele.group !== 'edges') return;
+        const source = ele.data.source;
+        const target = ele.data.target;
+        if (!source || !target) return;
+        const src = String(source), tgt = String(target);
+        if (!nodeIds.has(src) || !nodeIds.has(tgt)) return;
+        const id = ele.data.id ? String(ele.data.id) : 'e' + edges.length;
+        edges.push({ ...ele, data: { ...ele.data, id, source: src, target: tgt } });
+      });
+
+      return { nodes, edges };
+    }
+
+    function resyncCounters() {
+      const nodeNums = cy.nodes().map(n => parseInt((n.id().match(/\d+/) || [])[0], 10)).filter(Number.isFinite);
+      const edgeNums = cy.edges().map(e => parseInt((e.id().match(/\d+/) || [])[0], 10)).filter(Number.isFinite);
+      nextNodeId = nodeNums.length ? Math.max(...nodeNums) + 1 : 0;
+      nextEdgeId = edgeNums.length ? Math.max(...edgeNums) + 1 : 0;
+    }
+
+    function saveState() {
+      if (isRestoring) return;
+      const snapshot = cy.elements().jsons().map(cleanElement).filter(Boolean);
+      try {
+        sessionStorage.setItem(GRAPH_KEY, JSON.stringify(snapshot));
+      } catch (e) {
+        console.warn('saveState failed', e);
+      }
+      LOG('saveState', { nodes: cy.nodes().length, edges: cy.edges().length });
+    }
+
+    function restoreGraphFromSnapshot(snapshotList) {
+      const list = Array.isArray(snapshotList) ? snapshotList : readSnapshot();
+      const { nodes, edges } = prepareElements(list);
+      LOG('restoreGraphFromSnapshot prepared', { nodes: nodes.length, edges: edges.length });
+
+      isRestoring = true;
+      cy.elements().remove();
+      if (nodes.length) cy.add(nodes);
+
+      const finalize = () => {
+        resyncCounters();
+        requestAnimationFrame(() => {
+          cy.resize();
+          isRestoring = false;
+          // Persist normalized snapshot so future loads are consistent
+          saveState();
+        });
+      };
+
+      if (!edges.length) {
+        finalize();
+        return;
+      }
+
+      // Load edges on the next tick to ensure node registry is complete
+      requestAnimationFrame(() => {
+        cy.add(edges);
+        finalize();
+      });
+    }
 
     const cy = cytoscape({
       container: document.getElementById('cy'),
@@ -154,41 +296,21 @@
       style: [
         { selector: 'node', style: {
             'label': 'data(label)',
-            'text-valign': 'center',
-            'text-halign': 'center',
-            'color': '#fff',
-            'width': 'label',
-            'height': 50,
+            'text-valign': 'center', 'text-halign': 'center',
+            'color': '#fff', 'width': 'label', 'height': 50,
             'background-color': '#666'
           }
         },
-        { selector: '.decision', style: {
-            'shape': 'diamond',
-            'background-color': '#4CAF50',
-            'padding': '30px'
-          }
-        },
-        { selector: '.leaf', style: {
-            'shape': 'roundrectangle',
-            'background-color': '#2196F3',
-            'padding': '10px'
-          }
-        },
+        { selector: '.decision', style: { 'shape': 'diamond', 'background-color': '#4CAF50', 'padding': '30px' } },
+        { selector: '.leaf', style: { 'shape': 'roundrectangle', 'background-color': '#2196F3', 'padding': '10px' } },
         { selector: 'edge', style: {
-            'width': 2,
-            'line-color': '#000',
-            'target-arrow-shape': 'triangle',
-            'target-arrow-color': '#000',
-            'arrow-scale': 1.2,
-            'curve-style': 'bezier',
-            'label': 'data(label)',
-            'text-margin-y': -10,
-            'text-background-opacity': 1,
-            'text-background-color': '#fff',
-            'text-background-shape': 'roundrectangle',
-            'text-background-padding': 2,
-            'font-size': 12,
-            'text-rotation': 'autorotate'
+            'width': 2, 'line-color': '#000',
+            'target-arrow-shape': 'triangle', 'target-arrow-color': '#000',
+            'arrow-scale': 1.2, 'curve-style': 'bezier',
+            'label': 'data(label)', 'text-margin-y': -10,
+            'text-background-opacity': 1, 'text-background-color': '#fff',
+            'text-background-shape': 'roundrectangle', 'text-background-padding': 2,
+            'font-size': 12, 'text-rotation': 'autorotate'
           }
         }
       ],
@@ -199,73 +321,26 @@
     if (window.ResizeObserver) {
       new ResizeObserver(() => cy.resize()).observe(cyEl);
     }
-
-    requestAnimationFrame(() => { cy.resize(); });
     window.addEventListener('resize', () => cy.resize());
 
-    let nextNodeId = 0, nextEdgeId = 0;
+    // Auto-save on changes
+    cy.on('add remove data position', saveState);
 
-    function updateURL(arr){
-      const comp = LZString.compressToEncodedURIComponent(JSON.stringify(arr));
-      history.replaceState(null, '', '#' + comp);
-    }
-
-    function saveState(){
-      const snap = cy.elements().jsons().map(ele => {
-        const out = { group: ele.group, data: { ...ele.data } };
-        if(ele.group === 'nodes' && ele.position) out.position = { ...ele.position };
-        if(ele.classes && ele.classes.length) out.classes = ele.classes;
-        return out;
-      });
-      updateURL(snap);
-    }
-
-    function loadFromURL(){
-      const h = location.hash.slice(1);
-
-      if(!h) return null;
-      try{
-        return JSON.parse(LZString.decompressFromEncodedURIComponent(h));
-      }catch(e){
-        return null;
-      }
-
-    }
-
-    function restoreGraph(snap){
-      cy.elements().remove();
-      if(!Array.isArray(snap) || !snap.length){
-        nextNodeId = nextEdgeId = 0;
-        return;
-      }
-      const clean = ele => {
-        const out = { group: ele.group, data: { ...ele.data } };
-        if(ele.group === 'nodes' && ele.position) out.position = { ...ele.position };
-        if(ele.classes) out.classes = ele.classes;
-        return out;
-      };
-      const nodes = snap.filter(e => e.group === 'nodes').map(clean);
-      const edges = snap.filter(e => e.group === 'edges').map(clean);
-      cy.add(nodes);
-      cy.add(edges);
-      const nIds = cy.nodes().map(n => +n.id().slice(1)).filter(x => !isNaN(x));
-      const eIds = cy.edges().map(e => +e.id().slice(1)).filter(x => !isNaN(x));
-      nextNodeId = nIds.length ? Math.max(...nIds) + 1 : 0;
-      nextEdgeId = eIds.length ? Math.max(...eIds) + 1 : 0;
-    }
-
-    window.addEventListener('popstate', () => {
-      const snap = loadFromURL();
-      if(snap) restoreGraph(snap);
-    });
-    const initial = loadFromURL();
-    if(initial) restoreGraph(initial); else saveState();
+    // Initial Load
+    const initialSnapshot = readSnapshot();
+    LOG('initial snapshot', { count: initialSnapshot.length, sample: initialSnapshot.slice(0,3) });
+    if(initialSnapshot.length) restoreGraphFromSnapshot(initialSnapshot);
+    else saveState();
 
     function addNode(type) {
       const id = (type==='decision'? 'd' : 'l') + nextNodeId++;
-      cy.add({ group: 'nodes', data: { id, label: type==='decision'? 'Décision':'Résultat' }, classes: type,
-        position: { x:100+Math.random()*400, y:100+Math.random()*300 } });
-      saveState();
+      cy.add({ 
+        group: 'nodes', 
+        data: { id, label: type==='decision'? 'Décision':'Résultat' }, 
+        classes: type,
+        position: { x:100+Math.random()*400, y:100+Math.random()*300 } 
+      });
+      // Note: 'add' event triggers saveState automatically
     }
     document.getElementById('addDecision').onclick = () => addNode('decision');
     document.getElementById('addLeaf').onclick     = () => addNode('leaf');
@@ -328,12 +403,11 @@
     });
     cy.on('cxttapend', () => {
       line.setAttribute('visibility','hidden');
-      if (didDrag && linkOrigin && linkTarget &&
-          linkOrigin.id()!==linkTarget.id()) {
-        const cnt = cy.edges()
-          .filter(e => e.source().id()===linkOrigin.id())
-          .length;
+      if (didDrag && linkOrigin && linkTarget && linkOrigin.id()!==linkTarget.id()) {
+        const cnt = cy.edges().filter(e => e.source().id()===linkOrigin.id()).length;
         const lbl = cnt===0 ? 'oui' : cnt===1 ? 'non' : '';
+        
+        // Add edge
         cy.add({
           group:'edges',
           data:{
@@ -344,7 +418,8 @@
           }
         });
         nextEdgeId++;
-        saveState();
+        // NOTE: removed explicit saveState() here because cy.add triggers the 'add' event, 
+        // which calls saveState() automatically. Double-saving caused race conditions.
       }
       linkOrigin = linkTarget = null;
       didDrag = false;
@@ -374,20 +449,23 @@
     cy.on('grab','node', evt => grab=evt.target);
     cy.on('drag', evt => {
       if(!grab) return;
-      const rect= document.getElementById('trash').getBoundingClientRect();
+      const trash = document.getElementById('trash');
+      const rect= trash.getBoundingClientRect();
       const cr=document.getElementById('cy').getBoundingClientRect();
       const p=evt.renderedPosition; const ax=cr.left+p.x, ay=cr.top+p.y;
-      document.getElementById('trash').classList[ ax>=rect.left&&ax<=rect.right&&ay>=rect.top&&ay<=rect.bottom? 'add':'remove']('hovered');
+      trash.classList[ ax>=rect.left&&ax<=rect.right&&ay>=rect.top&&ay<=rect.bottom? 'add':'remove']('hovered');
     });
     cy.on('free','node', evt => {
       if(!grab) return;
-      const rect= document.getElementById('trash').getBoundingClientRect();
+      const trash = document.getElementById('trash');
+      const rect= trash.getBoundingClientRect();
       const cr=document.getElementById('cy').getBoundingClientRect();
       const p=evt.renderedPosition; const ax=cr.left+p.x, ay=cr.top+p.y;
       if(ax>=rect.left&&ax<=rect.right&&ay>=rect.top&&ay<=rect.bottom) {
         grab.connectedEdges().remove(); grab.remove();
-      } else saveState();
-      document.getElementById('trash').classList.remove('hovered'); grab=null;
+        // saveState() triggers automatically on 'remove'
+      }
+      trash.classList.remove('hovered'); grab=null;
     });
   </script>
 </body>

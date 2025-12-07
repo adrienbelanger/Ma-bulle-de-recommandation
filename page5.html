@@ -8,7 +8,7 @@
     body {
       margin: 0; padding: 0; font-family: Verdana, sans-serif;
       background: linear-gradient(to bottom, #5bc0eb, #20639b);
-      min-height: 100vh; overflow-x: hidden; overflow-y: auto; position: relative;
+      height: 100vh; overflow: hidden; position: relative;
       display: flex; flex-direction: column;
       opacity: 0; animation: fadeIn 0.5s ease forwards;
     }
@@ -20,7 +20,7 @@
       color: white;
       text-align: center;
       font-size: 2rem;
-      margin: 1rem auto 0;
+      margin: 0.8rem auto 0.25rem;
     }
 
     .content {
@@ -32,28 +32,37 @@
       justify-content: center;
       align-items: stretch;
       gap: 1rem;
+      height: calc(100vh - 150px);
     }
 
     .panel {
-      flex: 1;
+      flex: 1 1 auto;
       background: rgba(255,255,255,0.15);
       border-radius: 12px;
-      padding: 1.5rem;
+      padding: 1.25rem;
       color: white;
       display: flex;
       flex-direction: column;
-      overflow-y: auto;
+      overflow: hidden;
       box-shadow: 0 4px 10px rgba(0,0,0,0.2);
     }
 
-    .panel h2 { margin-top: 0; font-size: 1.4rem; border-bottom: 1px solid rgba(255,255,255,0.3); padding-bottom: .5rem; margin-bottom: 1rem; }
+    .panel h2 { margin: 0 0 .75rem 0; font-size: 1.3rem; border-bottom: 1px solid rgba(255,255,255,0.3); padding-bottom: .35rem; }
 
-    #cy { flex: 1 1 auto; min-height: 0; background: #fff; border-radius: 0; }
+    #cy { width: 100%; height: 100%; min-height: 240px; background: #fff; border-radius: 10px; flex: 1 1 auto; }
 
     .counter { margin-top: .5rem; font-size: .95rem; }
-    .bottom { margin-top: auto; display: flex; flex-direction: column; gap: .75rem; }
+    .counter-row { display: flex; gap: 1rem; align-items: center; }
+
+    /* Layout tuning so options are always visible */
+    .stats-panel { flex: 0 0 280px; }
+    .tree-panel { flex: 1 1 auto; display: grid; grid-template-rows: auto 1fr; gap: .75rem; }
+    .tree-layout { display: grid; grid-template-rows: minmax(260px, 1fr) minmax(220px, 1fr); gap: .75rem; height: 100%; min-height: 0; }
+    .tree-area { background: rgba(255,255,255,0.08); border-radius: 10px; padding: .5rem; display: flex; }
+    .options-wrap { display: grid; grid-template-rows: auto 1fr; gap: .5rem; min-height: 0; }
+
     /* NEW: 4-card choice grid */
-    .options-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .75rem; }
+    .options-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: .75rem; height: 100%; overflow: auto; padding-right: .25rem; }
     .option-card { background: rgba(255,255,255,0.92); color:#222; border-radius: 10px; padding: .75rem; box-shadow: 0 2px 6px rgba(0,0,0,.15); cursor: pointer; user-select: none; }
     .option-card h3 { margin: 0 0 .25rem 0; font-size: 1rem; line-height: 1.2; }
     .option-card .tag { display:inline-block; font-size:.8rem; padding:2px 6px; border-radius:999px; background:#20639b; color:#fff; margin-bottom:.25rem; }
@@ -98,20 +107,24 @@
   <div class="nav-bubble nav-right" onclick="navigate('index.html')">▶</div>
   <h1 id="current-title"></h1>
   <div class="content">
-    <div class="panel">
+    <div class="panel stats-panel">
       <h2>Modèle Entraîné</h2>
       <div id="model-pred">Le robot a choisi : <em>(aucune)</em></div>
       <div class="counter">✅: <span id="model-correct">0</span></div>
     </div>
-    <div class="panel">
+    <div class="panel tree-panel">
       <h2>Arbre de Décision</h2>
-      <div id="cy"></div>
-
-      <div class="bottom">
-        <div class="counter">✅: <span id="user-correct">0</span></div>
-
-        <!-- NEW: four datapoints to choose from -->
-        <div id="option-grid" class="options-grid"></div>
+      <div class="tree-layout">
+        <div class="tree-area">
+          <div id="cy"></div>
+        </div>
+        <div class="options-wrap">
+          <div class="counter-row">
+            <div class="counter">✅: <span id="user-correct">0</span></div>
+          </div>
+          <!-- NEW: four datapoints to choose from -->
+          <div id="option-grid" class="options-grid"></div>
+        </div>
       </div>
     </div>
   </div>
@@ -122,8 +135,142 @@
   <div class="bubble-floating" style="left:90%;width:80px;height:80px;animation-delay:4s"></div>
 
 <script>
+const LOG = (...args) => { try { console.log('[page5]', ...args); } catch (_) {} };
+function navigate(url){
+  LOG('navigate', url);
+  document.body.classList.add('fade-out');
+  document.body.addEventListener('animationend',()=>location.href=url,{once:true});
+}
+
+// --- Graph state (rebuilt) ---
+const GRAPH_KEY = 'graphSessionV1';
+let isRestoring = false;
+let cy; // set on DOMContentLoaded
+
+function cleanElement(ele) {
+  if (!ele || !ele.group || !ele.data) return null;
+  const base = { group: ele.group, data: { ...ele.data } };
+  const cls = ele.classes || ele.data.classes;
+  if (cls && String(cls).trim()) {
+    base.classes = Array.isArray(cls) ? cls.join(' ') : String(cls);
+  }
+  if (ele.group === 'nodes') {
+    const pos = ele.position;
+    if (pos && Number.isFinite(pos.x) && Number.isFinite(pos.y)) {
+      base.position = { x: Number(pos.x), y: Number(pos.y) };
+    }
+  }
+  return base;
+}
+
+function normalizeSnapshotShape(raw) {
+  if (!raw) return [];
+  if (Array.isArray(raw)) return raw;
+  if (raw.nodes || raw.edges) return [...(raw.nodes || []), ...(raw.edges || [])];
+  return [];
+}
+
+function readSnapshot() {
+  const raw = sessionStorage.getItem(GRAPH_KEY);
+  LOG('readSnapshot raw exists', !!raw);
+  if (!raw) return [];
+
+  const parse = txt => normalizeSnapshotShape(JSON.parse(txt));
+
+  try {
+    const parsed = parse(raw);
+    if (parsed.length) return parsed;
+  } catch (e) { LOG('readSnapshot json fail', e); }
+
+  try {
+    const txt = LZString.decompressFromEncodedURIComponent(raw);
+    if (txt) {
+      const parsed = parse(txt);
+      if (parsed.length) return parsed;
+    }
+  } catch (e) { LOG('readSnapshot lz fail', e); }
+
+  return [];
+}
+
+function prepareElements(list) {
+  const cleaned = list.map(cleanElement).filter(Boolean);
+  const nodes = [];
+  const edges = [];
+  const nodeIds = new Set();
+
+  // Simple grid fallback
+  let col = 0, row = 0;
+  const stepX = 240, stepY = 140, startX = 140, startY = 160, maxCols = 3;
+
+  cleaned.forEach(ele => {
+    if (ele.group !== 'nodes') return;
+    const id = String(ele.data.id || ele.data.name || 'n' + nodes.length);
+    if (nodeIds.has(id)) return;
+    const node = { ...ele, data: { ...ele.data, id } };
+    if (!node.position) {
+      node.position = { x: startX + col * stepX, y: startY + row * stepY };
+      col = (col + 1) % maxCols;
+      if (col === 0) row++;
+    }
+    nodeIds.add(id);
+    nodes.push(node);
+  });
+
+  cleaned.forEach(ele => {
+    if (ele.group !== 'edges') return;
+    const src = ele.data.source, tgt = ele.data.target;
+    if (!src || !tgt) return;
+    const source = String(src), target = String(tgt);
+    if (!nodeIds.has(source) || !nodeIds.has(target)) return;
+    const id = ele.data.id ? String(ele.data.id) : 'e' + edges.length;
+    edges.push({ ...ele, data: { ...ele.data, id, source, target } });
+  });
+
+  return { nodes, edges };
+}
+
+function saveState() {
+  if (isRestoring || !cy) return;
+  const snapshot = cy.elements().jsons().map(cleanElement).filter(Boolean);
+  try {
+    sessionStorage.setItem(GRAPH_KEY, JSON.stringify(snapshot));
+  } catch (e) {
+    console.warn('saveState failed', e);
+  }
+  LOG('saveState', { nodes: cy.nodes().length, edges: cy.edges().length });
+}
+
+function restoreGraphFromSnapshot(snapshotList) {
+  const { nodes, edges } = prepareElements(Array.isArray(snapshotList) ? snapshotList : readSnapshot());
+  LOG('restoreGraphFromSnapshot prepared', { nodes: nodes.length, edges: edges.length });
+
+  isRestoring = true;
+  cy.elements().remove();
+  if (nodes.length) cy.add(nodes);
+
+  const finalize = () => {
+    requestAnimationFrame(() => {
+      cy.resize();
+      if (cy.elements().length) cy.fit(null, 60);
+      isRestoring = false;
+      saveState(); // persist normalized snapshot
+    });
+  };
+
+  if (!edges.length) {
+    finalize();
+    return;
+  }
+
+  requestAnimationFrame(() => {
+    cy.add(edges);
+    finalize();
+  });
+}
+
 document.addEventListener('DOMContentLoaded', () => {
-  const cy = cytoscape({
+  cy = cytoscape({
     container: document.getElementById('cy'),
     elements: [],
     style: [
@@ -159,51 +306,17 @@ document.addEventListener('DOMContentLoaded', () => {
   const cyEl = document.getElementById('cy');
 
   if (window.ResizeObserver) {
-    new ResizeObserver(() => { cy.resize(); cy.fit(null, 20); }).observe(cyEl);
+    new ResizeObserver(() => { cy.resize(); }).observe(cyEl);
   }
-  window.addEventListener('resize', () => { cy.resize(); cy.fit(null, 20); });
+  window.addEventListener('resize', () => { cy.resize(); });
 
-  function loadFromURL() {
-    const hash = location.hash.slice(1);
-    if (!hash) return null;
-    try {
-      const json = LZString.decompressFromEncodedURIComponent(hash);
-      return JSON.parse(json);
-    } catch (err) {
-      console.error('loadFromURL(): failed to parse:', err);
-      return null;
-    }
-  }
+  const initialSnapshot = readSnapshot();
+  LOG('initial snapshot', { count: initialSnapshot.length, sample: initialSnapshot.slice(0,3) });
+  if (initialSnapshot.length) restoreGraphFromSnapshot(initialSnapshot);
+  else saveState();
 
-  function restoreGraph(snap) {
-    cy.elements().remove();
-    if (!Array.isArray(snap) || !snap.length) return;
+  cy.on('add remove data position', saveState);
 
-    const clean = ele => {
-      const out = { group: ele.group, data: { ...ele.data } };
-      if (ele.group === 'nodes' && ele.position) out.position = { ...ele.position };
-      if (ele.classes) out.classes = ele.classes;
-      return out;
-    };
-
-    const nodes = snap.filter(e => e.group === 'nodes').map(clean);
-    const edges = snap.filter(e => e.group === 'edges').map(clean);
-
-    cy.add(nodes);
-    cy.add(edges);
-
-    requestAnimationFrame(() => {
-      cy.resize();
-      console.log(cy.container().getBoundingClientRect());
-
-      requestAnimationFrame(() => { cy.fit(null, 20); });
-    });
-  }
-
-  const initial = loadFromURL();
-  if (initial) restoreGraph(initial);
-
-  // expose cy to the rest of this script block
   window.cy = cy;
 });
 

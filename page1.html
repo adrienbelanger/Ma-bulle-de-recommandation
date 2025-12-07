@@ -138,8 +138,7 @@
   <script>
     function navigate(url) {
       document.body.classList.add('fade-out');
-      const dest = url + location.hash;
-      document.body.addEventListener('animationend', () => window.location.href = dest, { once: true });
+      document.body.addEventListener('animationend', () => window.location.href = url, { once: true });
     }
     const questions = [
   { age: 12, watched: 'Minecraft: Je vais battre le dragon!', category: 'Jeux', options: ['Je construit ma base secrète dans Minecraft', 'Un jour à Paris : vlog découverte', 'Je teste la recette du gâteau arc-en-ciel', 'Défi sport : 200 sauts à la corde'] },
